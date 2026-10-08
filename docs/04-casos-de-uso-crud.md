@@ -10,6 +10,39 @@ Implementar o ciclo completo de sugestões e seus filtros.
 
 Módulo 03-postgresql-flyway-jpa concluído no seu próprio projeto. Você continuará o seu código; a branch de exercício não fornece a solução anterior.
 
+## Veja o caminho
+
+```mermaid
+classDiagram
+    class SuggestionController {
+        +create(request)
+        +list(courseId, categoryId, q)
+        +get(id)
+        +update(id, request)
+        +delete(id)
+    }
+    class SuggestionService {
+        +create(command)
+        +list(courseId, categoryId, q)
+        +get(id)
+        +update(id, command)
+        +delete(id)
+    }
+    class SuggestionRepository {
+        <<interface>>
+        +save(suggestion)
+        +find(id)
+        +search(courseId, categoryId, term)
+        +delete(id)
+    }
+    class SuggestionPersistenceAdapter
+    class SuggestionJpaRepository
+    SuggestionController --> SuggestionService : delega
+    SuggestionService --> SuggestionRepository : depende do contrato
+    SuggestionPersistenceAdapter ..|> SuggestionRepository : implementa
+    SuggestionPersistenceAdapter --> SuggestionJpaRepository : usa
+```
+
 ## Passos
 
 1. Crie as interfaces de persistência no domínio e os adapters JPA em infrastructure.persistence. O domínio não importa HTTP nem JPA. Use um serviço de aplicação, sem criar uma classe por operação sem necessidade.

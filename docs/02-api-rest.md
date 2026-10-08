@@ -10,6 +10,22 @@ Definir o contrato da caixa e experimentar a primeira rota HTTP.
 
 Módulo 01-projeto-spring-boot concluído no seu próprio projeto. Você continuará o seu código; a branch de exercício não fornece a solução anterior.
 
+## Veja o caminho
+
+```mermaid
+sequenceDiagram
+    actor Aluno
+    participant Insomnia
+    participant MVC as Spring MVC
+    participant Controller as SuggestionController
+    Aluno->>Insomnia: Executa GET
+    Insomnia->>MVC: GET /api/suggestions
+    MVC->>Controller: list()
+    Controller-->>MVC: Lista vazia demonstrativa
+    MVC-->>Insomnia: 200 e array vazio
+    Insomnia-->>Aluno: Exibe status e JSON
+```
+
 ## Passos
 
 1. Leia os sete endpoints no contrato. Crie um controller REST demonstrativo para GET `/api/suggestions`, devolvendo array vazio. Ele será substituído pela consulta real no módulo 04.

@@ -10,6 +10,22 @@ Rejeitar entradas inválidas e explicar os erros de forma previsível.
 
 Módulo 04-casos-de-uso-crud concluído no seu próprio projeto. Você continuará o seu código; a branch de exercício não fornece a solução anterior.
 
+## Veja o caminho
+
+```mermaid
+stateDiagram-v2
+    [*] --> Recebida
+    Recebida --> Rejeitada: Entrada invalida / 400
+    Recebida --> Validada: Entrada valida
+    Validada --> NaoEncontrada: Recurso ausente / 404
+    Validada --> Concluida: Operacao realizada / 2xx
+    Validada --> FalhaInterna: Erro inesperado / 500
+    Rejeitada --> [*]
+    NaoEncontrada --> [*]
+    Concluida --> [*]
+    FalhaInterna --> [*]
+```
+
 ## Passos
 
 1. Adicione Validation. Marque title/content com @NotBlank, courseId/categoryId com @NotNull e @Positive; use @Valid no request body.

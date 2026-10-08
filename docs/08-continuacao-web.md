@@ -10,6 +10,22 @@ Planejar uma interface que consuma o contrato pronto: listar/filtrar sugestões,
 
 API validada e Swagger disponível. A tecnologia da interface será definida numa etapa futura; este roteiro não instala Thymeleaf nem framework frontend.
 
+## Veja o caminho
+
+```mermaid
+stateDiagram-v2
+    [*] --> Carregando
+    Carregando --> Lista: Consulta com resultados
+    Carregando --> Vazia: Consulta sem resultados
+    Carregando --> Erro: Falha de rede
+    Erro --> Carregando: Tentar novamente
+    Lista --> Formulario: Nova sugestao
+    Vazia --> Formulario: Primeira sugestao
+    Formulario --> Enviando: Enviar
+    Enviando --> Formulario: Corrigir campos
+    Enviando --> Carregando: Criacao confirmada
+```
+
 ## Passos
 
 1. Desenhe a lista, os filtros e o formulário com curso e categoria vindos dos catálogos.
