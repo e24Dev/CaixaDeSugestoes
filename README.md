@@ -1,3 +1,5 @@
+> **Solução do módulo 01** — branch `01-projeto-spring-boot-impl`. Consulte [como executar este checkpoint](SOLUCAO.md) e [a missão](docs/01-projeto-spring-boot.md). Esta branch contém código cumulativo somente até esta etapa.
+
 # Caixa de Sugestões Etec Prefeito Alberto Feres
 
 Uma ideia não deve desaparecer quando o servidor reinicia. Nesta trilha você vai construir uma API para cadastrar, consultar, filtrar, alterar e excluir sugestões, aprendendo HTTP, Java, Spring Boot e persistência em pequenas entregas.
