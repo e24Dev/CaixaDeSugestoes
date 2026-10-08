@@ -10,6 +10,19 @@ Criar um banco reproduzível e consultar os catálogos com JPA.
 
 Módulo 02-api-rest concluído no seu próprio projeto. Você continuará o seu código; a branch de exercício não fornece a solução anterior.
 
+## Veja o caminho
+
+```mermaid
+flowchart LR
+    sql["Migrations SQL"] --> flyway["Flyway"]
+    flyway --> banco[("PostgreSQL")]
+    hibernate["Hibernate validate"] --> banco
+    controller["CatalogController"] --> service["CatalogService"]
+    service --> adapter["CatalogPersistenceAdapter"]
+    adapter --> repo["Repositories JPA"]
+    repo --> banco
+```
+
 ## Passos
 
 1. Instale/inicie Docker e configure um serviço PostgreSQL 17 com database `caixa_sugestoes`, usuário `caixa`, senha local `caixa` e porta 5432. Use volume nomeado para preservar dados. Alternativa: crie banco e usuário em um PostgreSQL já instalado.

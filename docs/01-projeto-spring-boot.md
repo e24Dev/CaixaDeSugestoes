@@ -10,6 +10,17 @@ Criar o projeto Spring Boot do zero e compreender o que inicia o servidor.
 
 Ambiente preparado e modelo de dados lido. Você continuará o seu código; a branch de exercício não fornece a solução anterior.
 
+## Veja o caminho
+
+```mermaid
+flowchart LR
+    java["JDK 17"] --> gradle["Gradle Wrapper"]
+    gradle --> compilacao["Compilar e testar"]
+    gradle --> boot["Spring Boot"]
+    yaml["application.yaml"] --> boot
+    boot --> porta["HTTP na porta 8000"]
+```
+
 ## Passos
 
 1. Crie um projeto Gradle Groovy com Java 17, group `br.com.etecalbertoferes`, nome CaixaDeSugestoes e pacote `br.com.etecalbertoferes.CaixaDeSugestoes`. O Spring Initializr pode gerar o esqueleto; confira as versões em vez de aceitar versões diferentes automaticamente.

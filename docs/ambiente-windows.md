@@ -6,7 +6,7 @@ Tutorial para configurar **Oracle JDK 17 e IntelliJ IDEA gratuito** no **Windows
 
 ## 1. Entenda as versões usadas
 
-Este repositório já declara as seguintes versões:
+A trilha usa as versões abaixo. A main contém apenas material didático; os arquivos de projeto serão criados por você no módulo 01 e também existem nas branches -impl.
 
 | Componente | Configuração do projeto |
 | --- | --- |
@@ -162,7 +162,7 @@ O IntelliJ traz seu próprio runtime para executar a IDE. **Esse runtime não de
 
 ## 8. Abra o projeto no local correto
 
-1. Copie, extraia ou clone o material fornecido pelo professor em `C:\dev\projetos\CaixaDeSugestoes`.
+1. No [módulo 01](01-projeto-spring-boot.md), crie seu próprio projeto em `C:\dev\projetos\CaixaDeSugestoes`. Se ainda está preparando as ferramentas, retorne a esta seção depois de gerar o projeto. O clone da main é material de consulta e não contém código executável.
 2. Confirme que essa pasta contém `build.gradle`, `settings.gradle`, `gradlew.bat` e a pasta `src`. Se o ZIP criou outra pasta interna, abra a pasta que realmente contém esses arquivos.
 3. No IntelliJ, clique em **Open** e selecione essa pasta.
 4. Confirme a confiança no projeto se ele veio do material da aula.
@@ -201,7 +201,7 @@ A primeira sincronização precisa de internet para baixar a distribuição e as
 
 Em **Run → Edit Configurations**, quando houver uma configuração Java/Application, confira o campo **JRE / Java runtime** e selecione **Project SDK (17)** ou o JDK 17. Se o campo estiver oculto, procure-o em **Modify options**. Configurações de execução via Gradle usam a JVM configurada para o Gradle.
 
-No `build.gradle`, este projeto já contém:
+No `build.gradle` que você criará no módulo 01, configure:
 
 ```groovy
 java {
@@ -215,7 +215,7 @@ Mantenha essa configuração. A toolchain define o Java usado nas tarefas Java; 
 
 ## 10. Valide o ambiente com o Wrapper
 
-Abra um novo terminal PowerShell, inclusive dentro do IntelliJ, e execute:
+Depois de criar o projeto no módulo 01, abra um novo terminal PowerShell, inclusive dentro do IntelliJ, e execute:
 
 ```powershell
 Set-Location C:\dev\projetos\CaixaDeSugestoes
@@ -232,7 +232,7 @@ Confira:
 
 - O Java e o compilador mostram versão **17**.
 - O cache aponta para `C:\dev\gradle-cache`.
-- O Wrapper mostra **Gradle 9.7.1**, conforme o arquivo do repositório.
+- O Wrapper mostra **Gradle 9.7.1**, conforme o Wrapper do projeto criado no módulo 01.
 - Os campos de JVM do Wrapper apontam para Java 17; a lista de toolchains inclui o JDK 17 instalado em Program Files.
 - A compilação termina com **BUILD SUCCESSFUL**.
 

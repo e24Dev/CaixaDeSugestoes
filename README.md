@@ -1,4 +1,4 @@
-# Caixa de Sugestões Fatec Araras
+# Caixa de Sugestões Etec Prefeito Alberto Feres
 
 Uma ideia não deve desaparecer quando o servidor reinicia. Nesta trilha você vai construir uma API para cadastrar, consultar, filtrar, alterar e excluir sugestões, aprendendo HTTP, Java, Spring Boot e persistência em pequenas entregas.
 
@@ -8,6 +8,19 @@ Uma ideia não deve desaparecer quando o servidor reinicia. Nesta trilha você v
 2. Leia o [modelo de dados e contrato](docs/00-modelo-dados.md).
 3. Crie seu próprio projeto em uma pasta nova. A `main` contém material didático: **não há aplicação para executar aqui**.
 4. Siga os módulos abaixo, evoluindo seu projeto. Não troque o projeto do aluno por um checkout da solução.
+
+## Uma visão da jornada
+
+```mermaid
+flowchart LR
+    modelo["Entender o problema"] --> projeto["Criar o projeto"]
+    projeto --> http["Experimentar HTTP"]
+    http --> banco["Persistir dados"]
+    banco --> crud["Implementar regras"]
+    crud --> erros["Tratar erros"]
+    erros --> swagger["Documentar"]
+    swagger --> testes["Validar e entregar"]
+```
 
 ## Roteiro
 
@@ -47,4 +60,4 @@ Cada capítulo contém missão, pré-requisitos, passos, desafio e critérios de
 
 ## Referências e preservação
 
-A organização didática foi adaptada do [PIApi](https://github.com/F290-TP2/PIApi/tree/main/docs). O [rascunho anterior](docs/arquivo/rascunho-tutorial-original.md) foi preservado como arquivo histórico: suas rotas, paginação e links não orientam esta trilha.
+A organização didática foi adaptada do [PIApi](https://github.com/F290-TP2/PIApi/tree/main/docs). O [rascunho anterior](docs/arquivo/rascunho-tutorial-original.md) foi preservado como arquivo histórico com identificação institucional atualizada: suas rotas, paginação e links não orientam esta trilha.
