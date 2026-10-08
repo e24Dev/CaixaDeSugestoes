@@ -1,6 +1,8 @@
-# Missão: dar voz à escola 🗣️
+> Arquivo histórico com identificação institucional atualizada. A versão literal anterior está no commit 3785cc2. Este rascunho não orienta a trilha atual.
 
-**Laboratório de desenvolvimento web — Etec Alberto Feres**
+# Missão: dar voz à escola 
+
+**Laboratório de desenvolvimento web — Etec Prefeito Alberto Feres**
 
 Imagine uma caixa de sugestões que nunca fica perdida no corredor. Cada ideia recebe um número, pode ser consultada e continua guardada quando o computador reinicia. Nossa missão é construir o motor dessa caixa: uma API em Java.
 
@@ -41,9 +43,9 @@ Materiais de apoio: [guia de resgate](resgate.md), [glossário](glossario.md) e 
 - Pare o servidor com `Ctrl+C` antes de iniciá-lo novamente. Uma porta só atende um servidor de cada vez.
 - Digite e explique o código. Copiar ajuda a eliminar erros de transcrição, mas não substitui entender sua responsabilidade.
 
-## Por que aparecem cursos da Fatec no banco?
+## Por que aparecem cursos do catálogo didático no banco?
 
-A turma destinatária é a **Etec Alberto Feres**. O estudo de caso e os dados herdados desta API são da **Caixa de Sugestões Fatec Araras**. Por isso, Swagger e catálogos continuam com os nomes do projeto de origem. Não são uma lista oficial dos cursos da Etec. Mantemos esse conjunto para que o tutorial produza o mesmo resultado da implementação validada. Uma futura adaptação do catálogo deve ser combinada com o professor e feita por uma migration nova, sem editar uma migration já aplicada.
+A instituição desta trilha é a **Etec Prefeito Alberto Feres**. Os cursos são exemplos didáticos e não representam uma lista oficial de cursos da escola. Uma futura adaptação do catálogo deve ser combinada com o professor e feita por uma migration nova, sem editar uma migration já aplicada.
 
 ## Seu diário de bordo
 

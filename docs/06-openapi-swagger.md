@@ -10,6 +10,17 @@ Permitir que outra dupla descubra a API pelo navegador.
 
 Módulo 05-validacao-erros concluído no seu próprio projeto. Você continuará o seu código; a branch de exercício não fornece a solução anterior.
 
+## Veja o caminho
+
+```mermaid
+flowchart LR
+    dto["DTOs e validacoes"] --> springdoc["Springdoc"]
+    anotacoes["Descricoes das operacoes"] --> springdoc
+    springdoc --> json["OpenAPI JSON"]
+    json --> swagger["Swagger UI"]
+    swagger --> api["Requisicao real para a API"]
+```
+
 ## Passos
 
 1. Adicione `org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1`, compatível com Spring Boot 4. Configure `/swagger-ui.html` e `/v3/api-docs` no YAML.

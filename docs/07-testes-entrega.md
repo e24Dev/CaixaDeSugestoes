@@ -10,6 +10,20 @@ Verificar o contrato, empacotar a aplicação e demonstrar persistência.
 
 Módulo 06-openapi-swagger concluído no seu próprio projeto. Você continuará o seu código; a branch de exercício não fornece a solução anterior.
 
+## Veja o caminho
+
+```mermaid
+flowchart TD
+    unit["Servicos com Mockito"] --> suite["gradlew test"]
+    http["Controllers com MockMvc"] --> suite
+    db["PostgreSQL com Testcontainers"] --> suite
+    suite --> sucesso{"Todos passaram?"}
+    sucesso -->|"Nao"| corrigir["Investigar e corrigir"]
+    corrigir --> suite
+    sucesso -->|"Sim"| jar["gradlew bootJar"]
+    jar --> manual["Executar JAR e validar o ciclo HTTP"]
+```
+
 ## Passos
 
 1. Execute `./gradlew test` com Docker iniciado (Windows: `.\gradlew.bat test`). Testes unitários isolam serviços com Mockito; MockMvc verifica HTTP; Testcontainers testa PostgreSQL real.

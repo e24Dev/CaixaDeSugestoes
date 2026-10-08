@@ -10,6 +10,28 @@ Rejeitar entradas inválidas e explicar os erros de forma previsível.
 
 Módulo 04-casos-de-uso-crud concluído no seu próprio projeto. Você continuará o seu código; a branch de exercício não fornece a solução anterior.
 
+## Veja o caminho
+
+O diagrama resume os resultados tratados neste módulo. Cada requisição produz uma única resposta; uma correção do cliente inicia outra requisição.
+
+```mermaid
+stateDiagram-v2
+    direction TB
+    state "Validando entrada" as Validando
+    state "Executando operação" as Executando
+    state "Resposta HTTP" as Resposta
+
+    [*] --> Validando
+    Validando --> Executando: Entrada válida
+    Validando --> Resposta: Entrada inválida / 400
+    Executando --> Resposta: Recurso ausente / 404
+    Executando --> Resposta: Sucesso / 2xx
+    Executando --> Resposta: Falha inesperada / 500
+    Resposta --> [*]
+```
+
+“Recurso ausente” inclui a sugestão consultada por ID e as referências de curso ou categoria exigidas na escrita. Uma listagem sem resultados retorna **200 com `[]`**. Falhas inesperadas também podem ocorrer durante a validação e retornam 500; erros de protocolo preservam códigos como 405 e 415.
+
 ## Passos
 
 1. Adicione Validation. Marque title/content com @NotBlank, courseId/categoryId com @NotNull e @Positive; use @Valid no request body.
