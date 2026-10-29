@@ -1,53 +1,123 @@
-# Registro de validação da trilha
+# Validação da reprodução dos tutoriais
 
-Validação local realizada em 8 de outubro de 2026 com Java 17, Gradle 9.7.1,
-Spring Boot 4.1.1, PostgreSQL 17 em Docker e Springdoc 3.1.1.
+[Roteiro](../README.md) · [Guia do professor](guia-professor.md)
 
-## Checkpoints de implementação
+Validação realizada em **29 de outubro de 2026** na revisão
+`tutoriais-api-incremental`.
 
-| Módulo | Verificação | Resultado |
-| --- | --- | --- |
-| 01 | Contexto Spring sem banco | Aprovado |
-| 02 | Contexto e GET demonstrativo com MockMvc | Aprovado |
-| 03 | PostgreSQL, migrations, contexto e catálogos | Aprovado |
-| 04 | Serviços e controllers do CRUD | Aprovado |
-| 05 | Validação, erros de entrada e falhas inesperadas | Aprovado |
-| 06 | Swagger, OpenAPI e tipos de conteúdo JSON | Aprovado |
-| 07 | 25 testes, incluindo CRUD HTTP e consultas reais em PostgreSQL | Aprovado |
+## O que foi reproduzido
 
-O comando final foi `./gradlew test bootJar`. Nenhum teste foi ignorado.
-Os testes de integração usaram Testcontainers com banco isolado.
+Um projeto novo foi montado em uma pasta temporária, aplicando em ordem os
+blocos marcados com `<!-- arquivo: caminho -->` nos capítulos 01–09. Cada bloco
+contém um arquivo completo, criado ou substituído conforme a instrução.
+Nenhum arquivo Java, SQL ou de configuração foi obtido da solução para completar
+uma lacuna entre os capítulos.
 
-## Verificação do JAR
+Os únicos arquivos de bootstrap copiados do checkpoint 01 foram `gradlew`,
+`gradlew.bat` e o binário `gradle/wrapper/gradle-wrapper.jar`. Na reprodução pelo
+aluno, esses três arquivos vêm do projeto gerado pelo Initializr, conforme 01.
+O arquivo textual `gradle-wrapper.properties` está incluído no tutorial.
 
-- PostgreSQL criado por Docker Compose em instância isolada.
-- Swagger acessível e título institucional conferido no OpenAPI.
-- Catálogos com quatro cursos e três categorias.
-- POST retornando 201, Location e autor Anônimo quando omitido.
-- Request inválido retornando 400 com erro padronizado.
-- Processo Java encerrado e iniciado novamente: a sugestão persistiu.
-- PUT preservando criação, filtro encontrando a alteração, DELETE retornando 204 e consulta posterior retornando 404.
-- Reinício sem duplicar seeds.
+Depois de cada capítulo:
 
-## Material didático
+1. O conteúdo cumulativo de `src`, `build.gradle`, `settings.gradle`,
+   `gradle-wrapper.properties` e, a partir de 03, `compose.yaml` foi comparado
+   com a branch `-impl` correspondente.
+2. Foi conferida a ausência de arquivos de código pertencentes a etapas futuras.
+3. `./gradlew test bootJar --console=plain` foi executado no projeto reconstruído.
+4. Os resultados XML do Gradle foram conferidos quanto a falhas e testes ignorados.
 
-Os 14 diagramas Mermaid originais foram renderizados com Mermaid CLI e Chrome headless:
-entidade-relacionamento, classes, estados, sequência e fluxos dos módulos.
-A verificação garante sintaxe renderizável; o renderizador do GitHub pode variar
-levemente no posicionamento dos elementos.
+As branches foram usadas para comparação, não para preencher o código do projeto.
+As collections e o verificador opcional Node.js são materiais de apoio da solução
+final; sua importação está explicada em 07, sem exigir transcrição de seus exports.
 
-Após a revisão dos estados, o material passou a ter 15 diagramas: consulta e
-cadastro da interface agora têm desenhos separados. Os cinco diagramas de estado
-revisados foram renderizados com Mermaid CLI e Chrome headless e inspecionados
-visualmente para conferir rótulos, setas e legibilidade.
+## Resultado por etapa
 
-Importação visual da coleção no aplicativo Insomnia não foi automatizada. O arquivo
-usa o formato de exportação v4; sua estrutura, referências de ambiente e payloads
-foram conferidos, e as operações equivalentes foram exercitadas nos testes HTTP.
+| Etapa | Arquivos apresentados no capítulo | Arquivos cumulativos comparados | Testes | Resultado |
+| --- | --- | --- | --- | --- |
+| 01 | 6 | 6 | 1 | Testes e JAR aprovados |
+| 02 | 1 | 7 | 1 | Testes e JAR aprovados |
+| 03 | 20 | 24 | 1 | Testes e JAR aprovados |
+| 04 | 11 | 32 | 1 | Testes e JAR aprovados |
+| 05 | 6 | 35 | 9 | Testes e JAR aprovados |
+| 06 | 7 | 36 | 9 | Testes e JAR aprovados |
+| 07 | 3 | 38 | 20 | Testes e JAR aprovados |
 
-## Como repetir
+Todos os testes executados terminaram sem falhas, erros ou ignorados.
+A contagem por capítulo inclui arquivos substituídos. O conjunto cumulativo não
+inclui os três arquivos binários/scripts de bootstrap, os Markdown ou collections.
 
-Consulte a branch `07-testes-entrega-impl` em uma cópia separada, leia SOLUCAO.md,
-inicie Docker e execute `./gradlew test bootJar`. As branches de exercício e a main
-não contêm aplicação para executar. As branches permanecem locais até publicação
-pelo professor.
+A compilação usa a toolchain Java 17 do projeto. O Gradle e os testes foram
+executados no ambiente local disponível, com PostgreSQL 17 real via Testcontainers
+a partir de 03. Não foi utilizado H2.
+
+## Extensão de segurança: reprodução dos módulos 08–09
+
+A mesma extração de blocos foi aplicada em um projeto temporário novo, começando
+pelos capítulos 01–07 e continuando pelos arquivos de 08 e 09. A exclusão do teste
+Basic, instruída em 09, também foi aplicada. O conteúdo cumulativo foi comparado
+com o checkpoint 08 e com a implementação final 09.
+
+- 08: `test bootJar` aprovado, **26 testes**, zero falhas/erros/ignorados.
+- 09: `test bootJar` aprovado, **32 testes**, zero falhas/erros/ignorados.
+- O perfil de teste tem configuração isolada; a aplicação exige administrador e
+  chave provisionados no ambiente real.
+- As collections foram atualizadas por versão: Basic no checkpoint 08 e JWT no 09.
+- A validação final executou **58 requests** e verificou dados e token após reinício.
+- A documentação da interface web foi movida para `10-continuacao-web.md`.
+
+## Coerência documental conferida
+
+- Links locais de navegação, arquivos e branches de apoio.
+- Arquivos completos e caminhos explícitos em cada etapa.
+- Pacotes e imports iguais aos checkpoints de implementação.
+- Porta de referência 8000 e instruções para usar outra porta.
+- Banco, usuário e senha locais `suggestions`, iguais ao Compose e ao YAML.
+- Nenhuma dependência de Lombok nos exemplos.
+- Distinção entre banco do Compose e banco temporário de Testcontainers.
+- Testes e recursos introduzidos somente na etapa em que existem no gabarito.
+- Separação entre repositório documental, projeto do aluno e cópia de consulta.
+- Distribuição somente de `README.md` e `docs/` para manter main documental.
+
+## Diagramas Mermaid
+
+A documentação contém **28 diagramas**. A revisão inicial acrescentou nove e refinou o fluxo de erros. A extensão de
+segurança acrescentou cinco: acesso público/administrativo, permissões, login,
+validação Bearer e ciclo de expiração/reinício. Todos foram analisados e renderizados
+com Mermaid 12.2.0 em Chrome headless, sem falhas de sintaxe. Os novos diagramas
+e o fluxo de erros também foram conferidos visualmente.
+
+| Cenário acrescentado | Onde estudar |
+| --- | --- |
+| Material do professor e evolução do projeto do aluno | [Como estudar](como-estudar.md) |
+| Inicialização de PostgreSQL, Flyway e Hibernate | [03](03-postgresql-flyway-jpa.md) |
+| Sequência de atualização com ID e criação preservados | [04](04-casos-de-uso-crud.md) |
+| AND entre filtros e OR entre título e conteúdo | [Contrato](00-modelo-dados.md) |
+| Contrato OpenAPI e execução real pelo Swagger | [06](06-openapi-swagger.md) |
+| Banco temporário de teste e banco persistente da aplicação | [07](07-testes-entrega.md) |
+| Estados da interface após respostas da API | [Continuação web](10-continuacao-web.md) |
+| JDK, SDK, JVM do Gradle e toolchain | [Ambiente Windows](ambiente-windows.md) |
+| Distribuição somente de Markdown para main e checkpoints | [Guia do professor](guia-professor.md) |
+
+O fluxo de erros de [05](05-validacao-erros.md) agora distingue validação,
+ausência, protocolo e falha inesperada. Cada diagrama acompanha uma explicação,
+pergunta ou exercício de leitura. A versão do renderizador do GitHub pode
+produzir diferenças de posicionamento sem alterar a regra representada.
+
+## Limites da verificação
+
+A reconstrução foi automatizada pela extração dos blocos Markdown. Ela verifica
+que os arquivos necessários estão presentes, são cumulativos e compilam/testam,
+mas não simula digitação na IDE, geração pelo site Initializr ou configuração de
+um computador Windows novo. A preparação Windows continua sujeita à conferência do professor no ambiente
+da turma. A renderização dos diagramas foi verificada separadamente, conforme acima.
+
+A interface de importação do Insomnia/Postman não foi automatizada nesta revisão.
+A validação da API protegida incluiu 58 requisições das duas collections contra o
+JAR e preservação de dados e token após reinício; seu registro está em
+`VALIDACAO-API.md` na solução completa. Em aula, execute o fluxo do módulo 07 no
+cliente escolhido antes de avançar para Thymeleaf.
+
+A revisão está em `09-jwt-bearer-token-impl`, com novos checkpoints documentais
+08 e 09. A main e os checkpoints 01–07 permanecem preservados. Nenhuma branch
+foi publicada nesta etapa. O guia do professor mostra a integração documental após revisão.
