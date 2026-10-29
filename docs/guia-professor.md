@@ -6,7 +6,7 @@
 
 A `main` já contém somente documentação e arquivos auxiliares de Git. Não é
 necessário remover Java dela. A revisão dos tutoriais foi preparada na branch
-`codex/tutoriais-api-incremental`, criada a partir da implementação final para
+`tutoriais-api-incremental`, criada a partir da implementação final para
 permitir comparar os exemplos com o código. Essa branch de revisão também
 contém a aplicação; leve somente os Markdown para a `main` ao aprovar o material.
 
@@ -16,7 +16,7 @@ contém a aplicação; leve somente os Markdown para a `main` ao aprovar o mater
 | Branches 01–07 sem sufixo | Documentação dos exercícios |
 | Branches 01–07 com `-impl` | Código cumulativo de apoio até cada etapa |
 | `07-testes-entrega-impl` | Solução final, suíte completa e collections |
-| `codex/tutoriais-api-incremental` | Revisão dos capítulos, ainda separada da main |
+| `tutoriais-api-incremental` | Revisão dos capítulos, ainda separada da main |
 
 A etapa 07 já é a branch final completa; um nome extra como `api-completa` pode
 ser criado depois como referência de distribuição, se fizer sentido para a turma.
@@ -80,7 +80,7 @@ pois ela deriva da API e acrescentaria a aplicação à main.
 
 ```bash
 git switch main
-git restore --source=codex/tutoriais-api-incremental -- README.md docs
+git restore --source=tutoriais-api-incremental -- README.md docs
 git add README.md docs
 git diff --cached --name-only
 git commit -m "docs: publica trilha reproduzivel da API"
@@ -98,7 +98,7 @@ anteriores.
 
 ```mermaid
 flowchart TB
-    Revisao["codex/tutoriais-api-incremental<br/>Tutoriais revisados e API de referência"]
+    Revisao["tutoriais-api-incremental<br/>Tutoriais revisados e API de referência"]
     Revisao -->|"Copiar somente Markdown aprovado"| Main["main: entrada documental"]
     Main -->|"Sincronizar Markdown"| Estudos["Branches de estudo 01 a 07"]
     Main -->|"Sincronizar Markdown"| Impl["Branches -impl 01 a 07"]

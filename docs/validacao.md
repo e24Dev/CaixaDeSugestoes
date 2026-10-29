@@ -3,7 +3,7 @@
 [Roteiro](../README.md) · [Guia do professor](guia-professor.md)
 
 Validação realizada em **29 de outubro de 2026** na revisão
-`codex/tutoriais-api-incremental`.
+`tutoriais-api-incremental`.
 
 ## O que foi reproduzido
 
