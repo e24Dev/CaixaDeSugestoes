@@ -1,0 +1,18 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: suggestions
+      POSTGRES_USER: suggestions
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-suggestions}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U suggestions -d suggestions"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+volumes:
+  postgres_data:
