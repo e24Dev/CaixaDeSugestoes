@@ -21,7 +21,9 @@
         "courseId": "",
         "categoryId": "",
         "suggestionId": "",
-        "createdAt": ""
+        "createdAt": "",
+        "adminUsername": "",
+        "adminPassword": ""
       }
     },
     {
@@ -219,7 +221,11 @@
           "value": "application/json"
         }
       ],
-      "authentication": {},
+      "authentication": {
+        "type": "basic",
+        "username": "{{ _.adminUsername }}",
+        "password": "{{ _.adminPassword }}"
+      },
       "metaSortKey": 9,
       "afterResponseScript": "const expect = insomnia.expect;\nconst set = (key, value) => insomnia.environment.set(key, value);\nconst get = key => insomnia.environment.get(key);\ninsomnia.test('HTTP 200', () => expect(insomnia.response.code).to.eql(200));\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato da resposta', () => {expect(data.author).to.eql('Anônimo'); expect(data.createdAt).to.eql(get('createdAt'));});",
       "description": "Esperado: HTTP 200."
@@ -408,7 +414,11 @@
       "body": {},
       "parameters": [],
       "headers": [],
-      "authentication": {},
+      "authentication": {
+        "type": "basic",
+        "username": "{{ _.adminUsername }}",
+        "password": "{{ _.adminPassword }}"
+      },
       "metaSortKey": 18,
       "afterResponseScript": "const expect = insomnia.expect;\nconst set = (key, value) => insomnia.environment.set(key, value);\nconst get = key => insomnia.environment.get(key);\ninsomnia.test('HTTP 204', () => expect(insomnia.response.code).to.eql(204));\ninsomnia.test('Sem corpo', () => expect(insomnia.response.text()).to.eql(''));",
       "description": "Esperado: HTTP 204."
@@ -438,7 +448,11 @@
       "body": {},
       "parameters": [],
       "headers": [],
-      "authentication": {},
+      "authentication": {
+        "type": "basic",
+        "username": "{{ _.adminUsername }}",
+        "password": "{{ _.adminPassword }}"
+      },
       "metaSortKey": 20,
       "afterResponseScript": "const expect = insomnia.expect;\nconst set = (key, value) => insomnia.environment.set(key, value);\nconst get = key => insomnia.environment.get(key);\ninsomnia.test('HTTP 404', () => expect(insomnia.response.code).to.eql(404));\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato da resposta', () => {expect(data.status).to.eql(404); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');});",
       "description": "Esperado: HTTP 404."
@@ -461,7 +475,11 @@
           "value": "application/json"
         }
       ],
-      "authentication": {},
+      "authentication": {
+        "type": "basic",
+        "username": "{{ _.adminUsername }}",
+        "password": "{{ _.adminPassword }}"
+      },
       "metaSortKey": 21,
       "afterResponseScript": "const expect = insomnia.expect;\nconst set = (key, value) => insomnia.environment.set(key, value);\nconst get = key => insomnia.environment.get(key);\ninsomnia.test('HTTP 404', () => expect(insomnia.response.code).to.eql(404));\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato da resposta', () => {expect(data.status).to.eql(404); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');});",
       "description": "Esperado: HTTP 404."

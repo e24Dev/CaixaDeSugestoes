@@ -1,0 +1,7 @@
+app:
+  admin:
+    username: test-admin
+spring:
+  datasource:
+    hikari:
+      connection-timeout: 3000

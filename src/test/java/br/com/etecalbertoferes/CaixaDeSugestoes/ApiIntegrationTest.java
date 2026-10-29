@@ -11,6 +11,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import static org.assertj.core.api.Assertions.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -37,15 +38,15 @@ class ApiIntegrationTest extends ContextTest {
         Long id = Long.valueOf(location.substring(location.lastIndexOf('/')+1));
         Instant time = service.get(id).createdAt();
         mvc.perform(get(location)).andExpect(status().isOk()).andExpect(jsonPath("$.title").value("Tomadas"));
-        mvc.perform(put(location).contentType(MediaType.APPLICATION_JSON).content(body.replace("  Pessoa  ", "  ")))
+        mvc.perform(put(location).with(user("test-admin").roles("ADMIN")).contentType(MediaType.APPLICATION_JSON).content(body.replace("  Pessoa  ", "  ")))
             .andExpect(status().isOk()).andExpect(jsonPath("$.author").value("Anônimo"));
         assertThat(service.get(id).createdAt()).isEqualTo(time);
         em.flush();
         assertThat(jdbc.queryForObject("select author from suggestions where id=?", String.class, id)).isNull();
-        mvc.perform(delete(location)).andExpect(status().isNoContent()).andExpect(content().string(""));
+        mvc.perform(delete(location).with(user("test-admin").roles("ADMIN"))).andExpect(status().isNoContent()).andExpect(content().string(""));
         mvc.perform(get(location)).andExpect(status().isNotFound());
-        mvc.perform(delete(location)).andExpect(status().isNotFound());
-        mvc.perform(put(location).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isNotFound());
+        mvc.perform(delete(location).with(user("test-admin").roles("ADMIN"))).andExpect(status().isNotFound());
+        mvc.perform(put(location).with(user("test-admin").roles("ADMIN")).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isNotFound());
         assertThat(catalogs.courses()).hasSize(4);
         assertThat(catalogs.categories()).hasSize(3);
     }
@@ -72,7 +73,7 @@ class ApiIntegrationTest extends ContextTest {
     @Test void rejectedUpdatesPreserveStoredDataAndTextHasNo255Limit() throws Exception {
         Suggestion item = create("x".repeat(500), "y".repeat(1000), null, course(), category());
         String invalid = "{\"title\":\"change\",\"content\":\"change\",\"courseId\":"+course()+",\"categoryId\":999999}";
-        mvc.perform(put("/api/suggestions/"+item.id()).contentType(MediaType.APPLICATION_JSON).content(invalid)).andExpect(status().isNotFound());
+        mvc.perform(put("/api/suggestions/"+item.id()).with(user("test-admin").roles("ADMIN")).contentType(MediaType.APPLICATION_JSON).content(invalid)).andExpect(status().isNotFound());
         assertThat(service.get(item.id()).title()).hasSize(500);
         assertThat(service.get(item.id()).content()).hasSize(1000);
         mvc.perform(post("/api/suggestions").contentType(MediaType.APPLICATION_JSON).content(invalid)).andExpect(status().isNotFound());

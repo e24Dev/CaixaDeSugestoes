@@ -29,6 +29,16 @@
       "key": "createdAt",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "adminUsername",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "adminPassword",
+      "value": "",
+      "type": "string"
     }
   ],
   "item": [
@@ -300,6 +310,21 @@
               "language": "json"
             }
           }
+        },
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "{{adminUsername}}",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "{{adminPassword}}",
+              "type": "string"
+            }
+          ]
         }
       },
       "event": [
@@ -618,7 +643,22 @@
         "method": "DELETE",
         "header": [],
         "url": "{{baseUrl}}/api/suggestions/{{suggestionId}}",
-        "description": "Resultado esperado: HTTP 204."
+        "description": "Resultado esperado: HTTP 204.",
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "{{adminUsername}}",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "{{adminPassword}}",
+              "type": "string"
+            }
+          ]
+        }
       },
       "event": [
         {
@@ -668,7 +708,22 @@
         "method": "DELETE",
         "header": [],
         "url": "{{baseUrl}}/api/suggestions/{{suggestionId}}",
-        "description": "Resultado esperado: HTTP 404."
+        "description": "Resultado esperado: HTTP 404.",
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "{{adminUsername}}",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "{{adminPassword}}",
+              "type": "string"
+            }
+          ]
+        }
       },
       "event": [
         {
@@ -708,6 +763,21 @@
               "language": "json"
             }
           }
+        },
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "{{adminUsername}}",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "{{adminPassword}}",
+              "type": "string"
+            }
+          ]
         }
       },
       "event": [
