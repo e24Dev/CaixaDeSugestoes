@@ -209,6 +209,28 @@ Filtros diferentes se combinam por AND. q tem espaços das extremidades removido
 
 Sugestões: createdAt decrescente, desempate por id decrescente. Catálogos: name crescente. Não há page, size ou filtro de status.
 
+### Como os filtros decidem se um item entra na lista
+
+Cada condição precisa ser verdadeira. Um filtro ausente não restringe a busca;
+no filtro de texto, basta encontrar o trecho no título **ou** no conteúdo.
+
+```mermaid
+flowchart TD
+    Item["Uma sugestão candidata"] --> Curso{"Curso coincide<br/>ou courseId está ausente?"}
+    Curso -->|"Sim"| Categoria{"Categoria coincide<br/>ou categoryId está ausente?"}
+    Curso -->|"Não"| Fora["Fora do resultado"]
+    Categoria -->|"Sim"| Texto{"q está ausente ou vazio<br/>OU título contém q<br/>OU conteúdo contém q?"}
+    Categoria -->|"Não"| Fora
+    Texto -->|"Sim"| Lista["Entra na lista ordenada"]
+    Texto -->|"Não"| Fora
+```
+
+**Experimento:** crie duas sugestões com o mesmo trecho em cursos diferentes.
+Envie `courseId` junto de `q`: o texto encontrar a sugestão de outro curso não
+é suficiente para incluí-la. O adapter aplica essas condições no banco; o desenho
+representa a regra lógica, não um laço que carrega todos os registros em Java.
+
+
 ### Resposta de erro
 
 ```json

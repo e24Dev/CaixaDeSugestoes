@@ -1,8 +1,8 @@
 # Validação da API — 29/10/2026
 
 Este registro se refere ao código entregue em `07-testes-entrega-impl`.
-O relatório anterior em `docs/validacao.md` pertence ao material documental
-preexistente; os tutoriais não foram revisados nesta entrega.
+A reprodução dos tutoriais foi validada em uma etapa posterior e está
+registrada separadamente em [docs/validacao.md](docs/validacao.md).
 
 - `./gradlew test bootJar`: aprovado, 20 testes, zero falhas e zero ignorados.
 - Compilação com toolchain Java 17; execução do JAR com Java 21.0.12.

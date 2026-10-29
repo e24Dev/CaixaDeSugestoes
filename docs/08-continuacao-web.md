@@ -1,41 +1,86 @@
-# Continuação — uma interface para a caixa
+# Continuação — projeto web Java com Thymeleaf
 
-Esta é uma proposta futura, sem implementação ou branch -impl nesta entrega.
+[Roteiro](../README.md) · [Contrato da API](00-modelo-dados.md)
+
+Esta é uma proposta para a próxima entrega; não acrescenta implementação web à
+API nem um módulo executável nesta trilha.
 
 ## Missão
 
-Planejar uma interface que consuma o contrato pronto: listar/filtrar sugestões, consultar detalhe e cadastrar uma sugestão anônima ou identificada.
+Criar, em um projeto separado, uma aplicação Spring Boot com Thymeleaf que
+consuma a API validada para listar, filtrar, consultar, cadastrar, alterar e
+excluir sugestões.
 
 ## Pré-requisitos
 
-API validada e Swagger disponível. A tecnologia da interface será definida numa etapa futura; este roteiro não instala Thymeleaf nem framework frontend.
+API concluída em 07, testes aprovados, coleção Insomnia validada pelo professor
+e domínio do contrato HTTP. Consulte a solução final em `07-testes-entrega-impl`.
+Mantenha a API e o projeto web em pastas e portas diferentes.
 
-## Veja o caminho
+## Como as aplicações vão conversar
+
+```mermaid
+sequenceDiagram
+    actor Pessoa
+    participant Navegador
+    participant Web as Java com Thymeleaf
+    participant API as API REST
+    participant Banco as PostgreSQL
+    Pessoa->>Navegador: Preenche o formulário
+    Navegador->>Web: Envia os campos
+    Web->>API: POST /api/suggestions
+    API->>Banco: Persiste a sugestão
+    Banco-->>API: Registro criado
+    API-->>Web: 201 e JSON
+    Web-->>Navegador: Página renderizada
+```
+
+O navegador recebe HTML renderizado pelo projeto web. O servidor Java faz as
+chamadas à API por um cliente HTTP. Nesse fluxo, não é necessário CORS para as
+chamadas entre os dois servidores.
+
+## Planejamento da próxima trilha
+
+1. Definir o projeto web, sua porta e a URL base configurável da API.
+2. Criar cliente HTTP e DTOs do consumidor, sem acesso direto ao banco da API.
+3. Exibir cursos e categorias reais no formulário e nos filtros.
+4. Renderizar lista, detalhe e estados de lista vazia ou falha de comunicação.
+5. Implementar criação, edição e exclusão, respeitando 201/200/204.
+6. Exibir `fieldErrors` junto aos campos e mensagens de ausência ou falha de rede.
+7. Tratar autor opcional, datas e navegação após cada operação.
+8. Testar o fluxo entre navegador, projeto web e API.
+
+## Estados que a interface precisa representar
+
+A resposta HTTP orienta a próxima tela: uma lista vazia continua sendo sucesso;
+400 devolve os campos para correção, enquanto uma falha de rede permite tentar
+novamente. Esses estados pertencem à interface, não à tabela de sugestões.
 
 ```mermaid
 stateDiagram-v2
     [*] --> Carregando
-    Carregando --> Lista: Consulta com resultados
-    Carregando --> Vazia: Consulta sem resultados
-    Carregando --> Erro: Falha de rede
-    Erro --> Carregando: Tentar novamente
-    Lista --> Formulario: Nova sugestao
-    Vazia --> Formulario: Primeira sugestao
-    Formulario --> Enviando: Enviar
-    Enviando --> Formulario: Corrigir campos
-    Enviando --> Carregando: Criacao confirmada
+    Carregando --> Lista: GET 200 com itens
+    Carregando --> Vazia: GET 200 com array vazio
+    Carregando --> Falha: API indisponível
+    Falha --> Carregando: Tentar novamente
+    Lista --> Formulario: Nova sugestão
+    Vazia --> Formulario: Primeira sugestão
+    Formulario --> Enviando: Enviar campos
+    Enviando --> Formulario: 400 e fieldErrors
+    Enviando --> Formulario: 404 de catálogo ou falha de envio
+    Enviando --> Carregando: POST 201 confirmado
 ```
 
-## Passos
+**Exercício:** desenhe onde aparecem os erros de campo e como manter os dados
+digitados quando o envio falhar. Um retorno 500 deve exibir mensagem de falha e
+permitir uma ação de recuperação, sem anunciar sucesso.
 
-1. Desenhe a lista, os filtros e o formulário com curso e categoria vindos dos catálogos.
-2. Preveja carregamento, lista vazia, sucesso, erro por campo e falha de rede.
-3. Separe chamadas HTTP da apresentação; use o contrato da API sem duplicar regras de persistência.
+## Pronto para começar quando
 
-## Desafio
+- A API é reproduzível a partir dos capítulos e continua funcionando após reinício.
+- As collections comprovam sucessos e falhas previstas.
+- As responsabilidades do cliente web e da API estão claras.
+- O professor aprovou o contrato e definiu o escopo da próxima entrega.
 
-Peça a um colega que encontre uma sugestão pelo curso e proponha uma nova sem explicar o desenho.
-
-## Pronto quando
-
-A jornada e os estados estão descritos. Login, segurança e implementação da interface exigirão planejamento próprio.
+Autenticação, usuários e triagem serão decisões futuras; não devem ser introduzidos
+como dependências escondidas da interface desta etapa.

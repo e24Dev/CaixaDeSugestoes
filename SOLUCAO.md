@@ -1,7 +1,9 @@
 # API completa — checkpoint 07
 
-Implementação cumulativa para a futura aplicação Java com Thymeleaf. Os tutoriais
-existentes foram preservados; sua revisão fica para depois da validação manual da API.
+Implementação cumulativa para a futura aplicação Java com Thymeleaf. Os
+[tutoriais](README.md) mostram como reconstruir a API em sete etapas, com
+arquivos completos e checkpoints de apoio. Consulte também
+[como estudar](docs/como-estudar.md) e a [validação da reprodução](docs/validacao.md).
 
 ## Executar
 
