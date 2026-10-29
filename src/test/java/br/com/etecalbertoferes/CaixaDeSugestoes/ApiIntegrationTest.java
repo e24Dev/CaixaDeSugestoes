@@ -1,7 +1,6 @@
 package br.com.etecalbertoferes.CaixaDeSugestoes;
 
 import java.time.Instant;
-import java.util.Map;
 import br.com.etecalbertoferes.CaixaDeSugestoes.application.*;
 import br.com.etecalbertoferes.CaixaDeSugestoes.domain.*;
 import org.junit.jupiter.api.Test;

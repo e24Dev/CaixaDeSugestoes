@@ -18,6 +18,7 @@ import br.com.etecalbertoferes.CaixaDeSugestoes.domain.ResourceNotFoundException
 @RestControllerAdvice
 public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
+
     @Override
     protected ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException ex,
             HttpHeaders headers, HttpStatusCode status, WebRequest request) {
@@ -25,16 +26,19 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         ex.getBindingResult().getFieldErrors().forEach(e -> fields.putIfAbsent(e.getField(), e.getDefaultMessage()));
         return respond(status, "Dados inválidos", fields, headers, request);
     }
+
     @Override
     protected ResponseEntity<Object> handleHandlerMethodValidationException(HandlerMethodValidationException ex,
             HttpHeaders headers, HttpStatusCode status, WebRequest request) {
         Map<String, String> fields = new LinkedHashMap<>();
         ex.getParameterValidationResults().forEach(result -> {
             String name = result.getMethodParameter().getParameterName();
-            result.getResolvableErrors().forEach(error -> fields.putIfAbsent(name == null ? "id" : name, error.getDefaultMessage()));
+            result.getResolvableErrors()
+                    .forEach(error -> fields.putIfAbsent(name == null ? "id" : name, error.getDefaultMessage()));
         });
         return respond(status, "Dados inválidos", fields, headers, request);
     }
+
     @Override
     protected ResponseEntity<Object> handleExceptionInternal(Exception ex, Object body, HttpHeaders headers,
             HttpStatusCode status, WebRequest request) {
@@ -48,6 +52,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         };
         return respond(status, message, Map.of(), headers, request);
     }
+
     @ExceptionHandler(org.springframework.security.core.AuthenticationException.class)
     public ResponseEntity<Object> invalidCredentials(WebRequest request) {
         HttpHeaders headers = new HttpHeaders();
@@ -55,21 +60,26 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         headers.setCacheControl("no-store");
         return respond(HttpStatus.UNAUTHORIZED, "Credenciais inválidas", Map.of(), headers, request);
     }
+
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<Object> notFound(ResourceNotFoundException ex, WebRequest request) {
         return respond(HttpStatus.NOT_FOUND, ex.getMessage(), Map.of(), new HttpHeaders(), request);
     }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Object> unexpected(Exception ex, WebRequest request) {
         if (ex instanceof ErrorResponse error) {
             return respond(error.getStatusCode(), "Requisição inválida", Map.of(), error.getHeaders(), request);
         }
         log.error("Falha inesperada ao processar requisição", ex);
-        return respond(HttpStatus.INTERNAL_SERVER_ERROR, "Erro interno do servidor", Map.of(), new HttpHeaders(), request);
+        return respond(HttpStatus.INTERNAL_SERVER_ERROR, "Erro interno do servidor", Map.of(), new HttpHeaders(),
+                request);
     }
+
     private ResponseEntity<Object> respond(HttpStatusCode status, String message, Map<String, String> fields,
             HttpHeaders headers, WebRequest request) {
         HttpServletRequest servlet = ((ServletWebRequest) request).getRequest();
-        return new ResponseEntity<>(new ApiError(Instant.now(), status.value(), message, servlet.getRequestURI(), fields), headers, status);
+        return new ResponseEntity<>(
+                new ApiError(Instant.now(), status.value(), message, servlet.getRequestURI(), fields), headers, status);
     }
 }

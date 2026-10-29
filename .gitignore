@@ -43,3 +43,6 @@ out/
 
 # Credenciais locais carregadas automaticamente pelo Spring Boot
 config/application.properties
+
+# Chave JWT local persistente
+.local/

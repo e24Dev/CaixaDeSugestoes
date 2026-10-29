@@ -121,6 +121,17 @@ class JwtSecurityIntegrationTest extends ContextTest {
         mvc.perform(delete("/api/suggestions/999999").header("Authorization", "Bearer "+jwt))
             .andExpect(status().isForbidden()).andExpect(jsonPath("$.status").value(403));
     }
+    @Test void disablingAdminRejectsBothLoginAndPreviouslyIssuedJwt() throws Exception {
+        String jwt = token();
+        jdbc.update("update administrators set active=false where username=?", "test-admin");
+        try {
+            mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(java.util.Map.of("username", "test-admin", "password", ADMIN_PASSWORD))))
+                .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.message").value("Credenciais inválidas"));
+            mvc.perform(delete("/api/suggestions/999999").header("Authorization", "Bearer " + jwt))
+                .andExpect(status().isUnauthorized());
+        } finally { jdbc.update("update administrators set active=true where username=?", "test-admin"); }
+    }
     @Test void swaggerMarksOnlyMutationsWithBearerSecurity() throws Exception {
         mvc.perform(get("/v3/api-docs")).andExpect(status().isOk())
             .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.scheme").value("bearer"))

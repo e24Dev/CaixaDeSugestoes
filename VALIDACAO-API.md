@@ -1,48 +1,42 @@
-# Validação da API protegida — 29/10/2026
+# Validação da API — administrador no banco
 
-Solução atual: `09-jwt-bearer-token-impl`. A versão sem autenticação permanece
-em `07-testes-entrega-impl`; o checkpoint 08 usa Basic como exercício intermediário.
+Validação realizada em 29/10/2026 na solução `09-jwt-bearer-token-impl`.
 
-- `./gradlew test bootJar`: aprovado, **32 testes**, zero falhas e zero ignorados.
-- Checkpoint 08: **26 testes** aprovados, antes da substituição por JWT.
-- Toolchain Java 17; execução do JAR com Java 21.0.12.
-- PostgreSQL 17 real via Testcontainers nos testes e Compose na execução do JAR.
-- Login real e uso do JWT real para PUT/DELETE, sem sessão ou cookies de autenticação.
-- Consultas e POST público de sugestão permanecem disponíveis sem token.
-- Testes de senha incorreta, usuário inexistente, entrada inválida, 401 e 403.
-- Rejeição de token expirado, assinatura adulterada, issuer/audience/subject
-  incorretos e ausência de expiração.
-- Configuração de segredo fraco/ausente e senha administrativa sem hash é rejeitada.
-- Basic deixa de autenticar na versão final.
-- OpenAPI marca somente PUT/DELETE com requisito Bearer; login e POST público
-  continuam sem requisito global de autenticação.
-- **58 requisições** aprovadas: 29 Postman e 29 Insomnia contra o JAR protegido.
-  O verificador executa pré-scripts, requests e scripts de resposta usando uma
-  camada local de compatibilidade dos métodos usados pelas collections.
-- Senha temporária contendo aspas e barra invertida validada, conferindo a
-  serialização do JSON pelos pré-scripts, sem credenciais versionadas.
-- Reinício do JAR com a mesma chave: sugestão preservada com os mesmos dados e
-  JWT não expirado aceito na exclusão administrativa. Registro temporário removido.
-- A execução de validação usou porta 18000 e credenciais aleatórias temporárias,
-  sem interromper a API que já estava aberta no navegador.
+- `./gradlew build`: aprovado, **39 testes**, zero falhas/erros/ignorados.
+- Checkpoint 08 atualizado: build aprovado com **30 testes**.
+- Toolchain Java 17; JAR executado com Java 21.0.12.
+- PostgreSQL 17 real, Flyway V1/V2/V3 e validação JPA.
+- V3 cria administrators sem seed de credenciais.
+- Provisionamento grava BCrypt e recusa alterar/substituir uma conta existente.
+- Entrada inválida não cria conta; consultas e envio continuam públicos.
+- Login consulta o banco; conta inativa é rejeitada tanto no login quanto na
+  validação de um JWT emitido antes de sua desativação.
+- Chave automática aleatória de 32 bytes, reutilizada no arquivo local privado.
+- Testes de chave persistente, permissões POSIX, override externo e rejeição de
+  chave inválida sem sobrescrever o arquivo existente.
+- Testes JWT de assinatura, claims, expiração, 401/403, ausência de sessão e Basic desabilitado.
 
-A interface de importação dos clientes não foi automatizada. As credenciais e o
-segredo usados na validação não constituem defaults da aplicação. Para iniciar
-sua própria instância, siga [SOLUCAO.md](SOLUCAO.md).
+## Fluxo real validado em PostgreSQL isolado
 
-A reprodução dos tutoriais e a renderização dos diagramas estão registradas
-separadamente em [docs/validacao.md](docs/validacao.md).
+1. A API iniciou sem ADMIN_USERNAME, ADMIN_PASSWORD_HASH ou JWT_SECRET_BASE64.
+2. Migrations criaram o banco com catálogo e tabela administrativa vazia.
+3. A chave nasceu automaticamente em arquivo privado; login sem conta retornou 401.
+4. O JAR --setup-admin recebeu username, senha e confirmação em PTY real.
+5. A senha não apareceu no eco; a conta ficou persistida. Repetir o comando
+   retornou erro de conta existente, sem alterar a chave ou os dados.
+6. As duas collections executaram **58 requests** aprovados, com captura de
+   accessToken e autorização apenas nas operações administrativas.
+7. A senha temporária continha aspas e barra invertida, verificando a serialização.
+8. Desativar a conta no banco bloqueou login e uso do token.
+9. Reiniciar o JAR preservou a sugestão, a conta e a chave; o token ainda válido
+   foi aceito na exclusão administrativa.
+10. O container de validação foi removido e a API já aberta pelo usuário não foi interrompida.
 
-## Diagnóstico de bootRun no VSCode
+Não houve senha padrão ou credencial real versionada. A interface de importação
+no Insomnia/Postman não foi automatizada; requests e scripts foram exercitados
+com o verificador local de compatibilidade. Os testes não usam o banco do Compose.
 
-`./gradlew build` foi executado novamente: aprovado, com os 32 testes. A falha
-de `./gradlew bootRun` foi reproduzida e identificada como ausência de
-`ADMIN_USERNAME` no ambiente de execução; PostgreSQL e migrations funcionaram.
-
-Foi acrescentado `config/application.properties.example` e a regra de Git para
-ignorar o arquivo preenchido. A leitura automática de `config/application.properties`
-foi verificada em um JAR iniciado de uma pasta temporária, sem as variáveis
-administrativas exportadas: login, token e persistência após reinício aprovados.
-A validação usou credenciais aleatórias temporárias e não provisionou uma senha
-padrão na cópia de trabalho. O administrador deve escolher e configurar suas
-próprias credenciais conforme `SOLUCAO.md`.
+Os tutoriais 08 e 09 foram reconstruídos a partir dos próprios Markdown e passaram
+com 30 e 39 testes. Os **30 diagramas Mermaid** foram renderizados sem falhas.
+Consulte [SOLUCAO.md](SOLUCAO.md) para executar o fluxo e
+[docs/validacao.md](docs/validacao.md) para a verificação documental.

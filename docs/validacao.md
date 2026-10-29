@@ -3,7 +3,7 @@
 [Roteiro](../README.md) · [Guia do professor](guia-professor.md)
 
 Validação realizada em **29 de outubro de 2026** na revisão
-`tutoriais-api-incremental`.
+`09-jwt-bearer-token-impl` (incluindo a atualização da conta no banco).
 
 ## O que foi reproduzido
 
@@ -58,10 +58,10 @@ pelos capítulos 01–07 e continuando pelos arquivos de 08 e 09. A exclusão do
 Basic, instruída em 09, também foi aplicada. O conteúdo cumulativo foi comparado
 com o checkpoint 08 e com a implementação final 09.
 
-- 08: `test bootJar` aprovado, **26 testes**, zero falhas/erros/ignorados.
-- 09: `test bootJar` aprovado, **32 testes**, zero falhas/erros/ignorados.
-- O perfil de teste tem configuração isolada; a aplicação exige administrador e
-  chave provisionados no ambiente real.
+- 08: `test bootJar` aprovado, **30 testes**, zero falhas/erros/ignorados.
+- 09: `test bootJar` aprovado, **39 testes**, zero falhas/erros/ignorados.
+- O perfil de teste tem configuração isolada; a aplicação consulta o administrador
+  no banco e cria sua chave local automaticamente, sem credencial padrão.
 - As collections foram atualizadas por versão: Basic no checkpoint 08 e JWT no 09.
 - A validação final executou **58 requests** e verificou dados e token após reinício.
 - A documentação da interface web foi movida para `10-continuacao-web.md`.
@@ -81,11 +81,13 @@ com o checkpoint 08 e com a implementação final 09.
 
 ## Diagramas Mermaid
 
-A documentação contém **28 diagramas**. A revisão inicial acrescentou nove e refinou o fluxo de erros. A extensão de
+A documentação contém **30 diagramas**. A revisão inicial acrescentou nove e refinou o fluxo de erros. A extensão de
 segurança acrescentou cinco: acesso público/administrativo, permissões, login,
 validação Bearer e ciclo de expiração/reinício. Todos foram analisados e renderizados
 com Mermaid 12.2.0 em Chrome headless, sem falhas de sintaxe. Os novos diagramas
-e o fluxo de erros também foram conferidos visualmente.
+e o fluxo de erros também foram conferidos visualmente. A atualização no banco
+acrescenta o provisionamento inicial e o DER administrativo, e refina a geração
+automática de chave e a validação de conta ativa.
 
 | Cenário acrescentado | Onde estudar |
 | --- | --- |
@@ -118,6 +120,7 @@ JAR e preservação de dados e token após reinício; seu registro está em
 `VALIDACAO-API.md` na solução completa. Em aula, execute o fluxo do módulo 07 no
 cliente escolhido antes de avançar para Thymeleaf.
 
-A revisão está em `09-jwt-bearer-token-impl`, com novos checkpoints documentais
-08 e 09. A main e os checkpoints 01–07 permanecem preservados. Nenhuma branch
-foi publicada nesta etapa. O guia do professor mostra a integração documental após revisão.
+A documentação é distribuída para main e branches de estudo por cópia somente
+de README.md e docs/. O código dos checkpoints 01–07 permanece preservado.
+Os checkpoints 08–09 incluem a atualização administrativa; a publicação deve ser
+conferida comparando as referências locais e remotas, sem force push.

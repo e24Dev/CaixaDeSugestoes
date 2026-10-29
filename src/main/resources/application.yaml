@@ -23,9 +23,7 @@ springdoc:
   api-docs:
     path: /v3/api-docs
 app:
-  admin:
-    username: ${ADMIN_USERNAME}
-    password-hash: ${ADMIN_PASSWORD_HASH}
   jwt:
-    secret-base64: ${JWT_SECRET_BASE64}
+    secret-base64: ${JWT_SECRET_BASE64:}
+    key-file: ${JWT_KEY_FILE:.local/jwt-signing.key}
     ttl-seconds: ${JWT_TTL_SECONDS:900}

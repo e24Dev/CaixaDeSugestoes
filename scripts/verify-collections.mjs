@@ -1,5 +1,6 @@
 // Executa os requests e scripts exportados contra uma API local; sem dependências npm.
 // Uso: node scripts/verify-collections.mjs [http://localhost:8000]
+// ADMIN_USERNAME/ADMIN_PASSWORD são credenciais do cliente para a conta já cadastrada por --setup-admin.
 import { readFile } from 'node:fs/promises';
 import { strict as assert } from 'node:assert';
 import { runInNewContext } from 'node:vm';

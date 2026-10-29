@@ -7,9 +7,9 @@
 A `main` já contém somente documentação e arquivos auxiliares de Git. Não é
 necessário remover Java dela. A revisão dos tutoriais foi preparada na branch
 `tutoriais-api-incremental`, criada a partir da implementação final para
-permitir comparar os exemplos com o código. Essa branch de revisão também
-contém a aplicação. A revisão atual com segurança está em `09-jwt-bearer-token-impl`;
-leve somente os Markdown para a `main` ao aprovar o material.
+permitir comparar os exemplos com o código. Essa branch de revisão conserva a aplicação da etapa 07. A solução atual está
+em `09-jwt-bearer-token-impl`; somente os Markdown são sincronizados com main
+e com as branches de estudo.
 
 | Referência | Função |
 | --- | --- |
@@ -53,8 +53,8 @@ indica até onde vai o código executável, e não uma barreira para ler o mater
 | 05 | Validação e erros uniformes | 9, sendo 8 HTTP isolados |
 | 06 | Swagger e OpenAPI | Os mesmos 9 |
 | 07 | Precisão de datas, suíte completa e entrega | 20, incluindo integração |
-| 08 | Administrador BCrypt, Basic e permissões | 26 |
-| 09 | Login, JWT, Bearer e validação de claims | 32 |
+| 08 | Conta no banco, setup inicial e Basic | 30 |
+| 09 | Login, chave automática, JWT e conta ativa | 39 |
 
 Os testes de serviço e integração CRUD entram em 07. Não prometa que existem
 nos checkpoints anteriores. Antes de 05, erros de aplicação ainda não têm
@@ -70,8 +70,8 @@ não deve ignorar silenciosamente a integração.
 1. Use a preparação Windows e crie um projeto novo conforme 01.
 2. Aplique os arquivos dos capítulos 01–09, preservando o que não for substituído.
 3. Confira os critérios por etapa e execute os comandos apresentados.
-4. Em 07, espere 20 testes; em 08, 26; em 09, 32. Valide as collections da respectiva versão.
-5. Em 09, configure credenciais e chave locais, valide 401/403 e reinício com token não expirado.
+4. Em 07, espere 20 testes; em 08, 30; em 09, 39. Valide as collections da respectiva versão.
+5. Em 09, provisione a conta no banco, preserve a chave automática e valide 401/403 e reinício com token não expirado.
 6. Peça a uma dupla para repetir sem ajuda e registre as dúvidas de reprodução.
 
 O registro em [validacao.md](validacao.md) diferencia comparação automática,
@@ -79,8 +79,8 @@ execução real e conferências manuais que ainda cabem à turma.
 
 ## Levar somente os Markdown para main
 
-Esta é a etapa de distribuição **após revisar a branch de tutoriais**. Ela não
-foi executada automaticamente. Execute com árvore limpa; preserve alterações
+Este é o procedimento de distribuição documental usado nesta entrega.
+Para atualizações futuras, execute com árvore limpa; preserve alterações
 locais antes de trocar de branch. Não faça merge da branch de revisão inteira,
 pois ela deriva da API e acrescentaria a aplicação à main.
 
@@ -158,3 +158,16 @@ O projeto web será Java com Thymeleaf, em aplicação separada, consumindo HTTP
 Valide a API no Insomnia antes de iniciar essa etapa. O login é exclusivo do
 administrador. O projeto web deve manter o JWT no servidor e proteger sua sessão
 de navegador com CSRF. Não há cadastro público nem controle de propriedade.
+
+## Provisionamento administrativo e publicação
+
+V3 cria administrators sem senha embutida. Peça ao professor que escolha a conta
+com `java -jar ... --setup-admin`; não distribua credenciais compartilhadas em
+migration. A chave JWT nasce automaticamente em `.local` e deve ser preservada.
+A conta fica no banco do Compose; os testes provisionam sua própria conta em
+PostgreSQL temporário. Não confunda variáveis do cliente das collections com
+configuração da conta no servidor.
+
+A distribuição integra somente README.md e docs/ na main e nas branches
+pedagógicas, preservando o código incremental de cada `-impl`. A publicação usa
+push normal de todas as branches locais, sem force push e sem arquivos privados.

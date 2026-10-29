@@ -2,7 +2,7 @@
   "info": {
     "name": "Caixa de Sugestões — JWT Admin",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Etapa 09. Preencha adminUsername/adminPassword localmente; login captura accessToken. Execute em ordem; PUT/DELETE usam Bearer. Não exporte credenciais ou tokens reais."
+    "description": "Administrador cadastrado no PostgreSQL por --setup-admin. A chave JWT é criada automaticamente no servidor. Preencha adminUsername/adminPassword somente no cliente local; login captura accessToken. Execute em ordem, sem exportar credenciais ou tokens reais."
   },
   "variable": [
     {
