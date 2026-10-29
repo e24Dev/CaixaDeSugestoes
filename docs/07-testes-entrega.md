@@ -2,6 +2,9 @@
 
 [Roteiro](../README.md) · [Como estudar](como-estudar.md) · [Contrato](00-modelo-dados.md)
 
+Esta etapa fecha a API **sem autenticação**. Os módulos 08–09 acrescentam segurança;
+use as collections da branch 07 ao reproduzir somente este checkpoint.
+
 ## Missão
 
 Completar a suíte, gerar o JAR e provar que a API preserva dados após reinício.
@@ -415,4 +418,4 @@ git commit -m "Conclui modulo 07: testes-entrega"
 
 Não versione `.env`, senhas reais, `build/` ou `.gradle/`. Consulte o checkpoint em outra pasta, conforme o [guia de estudo](como-estudar.md), e compare responsabilidades e comportamento.
 
-[Próxima etapa: planejar o projeto web](08-continuacao-web.md)
+[Próxima etapa: Spring Security](08-spring-security.md)
