@@ -1,3 +1,7 @@
+> **Branch de implementação completa:** consulte [SOLUCAO.md](SOLUCAO.md) para
+> executar a API, importar as collections e testar. O roteiro pedagógico abaixo
+> foi preservado e será revisado após a validação manual.
+
 > **Solução do módulo 01** — branch `01-projeto-spring-boot-impl`. Consulte [como executar este checkpoint](SOLUCAO.md) e [a missão](docs/01-projeto-spring-boot.md). Esta branch contém código cumulativo somente até esta etapa.
 
 # Caixa de Sugestões Etec Prefeito Alberto Feres

@@ -24,7 +24,7 @@ public class SuggestionService {
     }
     @Transactional
     public Suggestion create(SuggestionCommand command) {
-        return suggestions.save(build(null, Instant.now(), command));
+        return suggestions.save(build(null, Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS), command));
     }
     @Transactional
     public Suggestion update(Long id, SuggestionCommand command) {

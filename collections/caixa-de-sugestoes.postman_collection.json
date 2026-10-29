@@ -1,0 +1,758 @@
+{
+  "info": {
+    "name": "Caixa de Sugestões — API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Execute em ordem. Catálogos e sugestão têm seus IDs capturados automaticamente. A etapa 19 exclui a sugestão criada pela etapa 03."
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "courseId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "categoryId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "suggestionId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "createdAt",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 - Consultar cursos",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/courses",
+        "description": "Resultado esperado: HTTP 200."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "const set = (key, value) => pm.collectionVariables.set(key, value);",
+              "const get = key => pm.collectionVariables.get(key);",
+              "const expect = pm.expect;",
+              "const data = pm.response.json();",
+              "set('courseId', data[0].id);",
+              "pm.test('Contrato da resposta', () => {expect(data.length).to.eql(4);});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 - Consultar categorias",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/categories",
+        "description": "Resultado esperado: HTTP 200."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "const set = (key, value) => pm.collectionVariables.set(key, value);",
+              "const get = key => pm.collectionVariables.get(key);",
+              "const expect = pm.expect;",
+              "const data = pm.response.json();",
+              "set('categoryId', data[0].id);",
+              "pm.test('Contrato da resposta', () => {expect(data.length).to.eql(3);});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 - Criar sugestão identificada",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/suggestions",
+        "description": "Resultado esperado: HTTP 201.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Mais tomadas na biblioteca 100%_!\",\n  \"content\": \"Instalar tomadas nas mesas de estudo.\",\n  \"author\": \"  Pessoa Exemplo  \",\n  \"courseId\": {{courseId}},\n  \"categoryId\": {{categoryId}}\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+              "const set = (key, value) => pm.collectionVariables.set(key, value);",
+              "const get = key => pm.collectionVariables.get(key);",
+              "const expect = pm.expect;",
+              "const data = pm.response.json();",
+              "set('suggestionId', data.id); set('createdAt', data.createdAt);",
+              "pm.test('Contrato da resposta', () => {expect(data.author).to.eql('Pessoa Exemplo'); expect(data.course.name).to.be.a('string'); expect(data.category.name).to.be.a('string');});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 - Consultar sugestão",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/suggestions/{{suggestionId}}",
+        "description": "Resultado esperado: HTTP 200."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "const set = (key, value) => pm.collectionVariables.set(key, value);",
+              "const get = key => pm.collectionVariables.get(key);",
+              "const expect = pm.expect;",
+              "const data = pm.response.json();",
+              "",
+              "pm.test('Contrato da resposta', () => {expect(data.createdAt).to.eql(get('createdAt'));});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 - Listar sugestões",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/suggestions",
+        "description": "Resultado esperado: HTTP 200."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "const set = (key, value) => pm.collectionVariables.set(key, value);",
+              "const get = key => pm.collectionVariables.get(key);",
+              "const expect = pm.expect;",
+              "const data = pm.response.json();",
+              "",
+              "pm.test('Contrato da resposta', () => {expect(data).to.be.an('array');});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 - Filtrar por curso",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/suggestions?courseId={{courseId}}",
+        "description": "Resultado esperado: HTTP 200."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "const set = (key, value) => pm.collectionVariables.set(key, value);",
+              "const get = key => pm.collectionVariables.get(key);",
+              "const expect = pm.expect;",
+              "const data = pm.response.json();",
+              "",
+              "pm.test('Contrato da resposta', () => {expect(data.every(x => String(x.course.id) === String(get('courseId')))).to.eql(true);});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 - Filtrar por categoria",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/suggestions?categoryId={{categoryId}}",
+        "description": "Resultado esperado: HTTP 200."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "const set = (key, value) => pm.collectionVariables.set(key, value);",
+              "const get = key => pm.collectionVariables.get(key);",
+              "const expect = pm.expect;",
+              "const data = pm.response.json();",
+              "",
+              "pm.test('Contrato da resposta', () => {expect(data.every(x => String(x.category.id) === String(get('categoryId')))).to.eql(true);});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 - Buscar texto literal e combinar filtros",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/suggestions?courseId={{courseId}}&categoryId={{categoryId}}&q=100%25_%21",
+        "description": "Resultado esperado: HTTP 200."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "const set = (key, value) => pm.collectionVariables.set(key, value);",
+              "const get = key => pm.collectionVariables.get(key);",
+              "const expect = pm.expect;",
+              "const data = pm.response.json();",
+              "",
+              "pm.test('Contrato da resposta', () => {expect(data.some(x => String(x.id) === String(get('suggestionId')))).to.eql(true);});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 - Filtro sem resultado",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/suggestions?courseId=9223372036854775807",
+        "description": "Resultado esperado: HTTP 200."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "const set = (key, value) => pm.collectionVariables.set(key, value);",
+              "const get = key => pm.collectionVariables.get(key);",
+              "const expect = pm.expect;",
+              "const data = pm.response.json();",
+              "",
+              "pm.test('Contrato da resposta', () => {expect(data).to.eql([]);});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 - Atualizar para anônima",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/suggestions/{{suggestionId}}",
+        "description": "Resultado esperado: HTTP 200.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Novas tomadas na biblioteca 100%_!\",\n  \"content\": \"Instalar tomadas nas mesas de estudo.\",\n  \"author\": \"   \",\n  \"courseId\": {{courseId}},\n  \"categoryId\": {{categoryId}}\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "const set = (key, value) => pm.collectionVariables.set(key, value);",
+              "const get = key => pm.collectionVariables.get(key);",
+              "const expect = pm.expect;",
+              "const data = pm.response.json();",
+              "",
+              "pm.test('Contrato da resposta', () => {expect(data.author).to.eql('Anônimo'); expect(data.createdAt).to.eql(get('createdAt'));});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11 - Rejeitar campos inválidos",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/suggestions",
+        "description": "Resultado esperado: HTTP 400.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"title\":\" \",\"content\":\"\",\"courseId\":0,\"categoryId\":-1}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+              "const set = (key, value) => pm.collectionVariables.set(key, value);",
+              "const get = key => pm.collectionVariables.get(key);",
+              "const expect = pm.expect;",
+              "const data = pm.response.json();",
+              "",
+              "pm.test('Contrato da resposta', () => {expect(data.status).to.eql(400); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');expect(data.fieldErrors).to.have.property('title');});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12 - Rejeitar filtro inválido",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/suggestions?courseId=-1",
+        "description": "Resultado esperado: HTTP 400."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+              "const set = (key, value) => pm.collectionVariables.set(key, value);",
+              "const get = key => pm.collectionVariables.get(key);",
+              "const expect = pm.expect;",
+              "const data = pm.response.json();",
+              "",
+              "pm.test('Contrato da resposta', () => {expect(data.status).to.eql(400); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "13 - Rejeitar ID inválido",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/suggestions/abc",
+        "description": "Resultado esperado: HTTP 400."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+              "const set = (key, value) => pm.collectionVariables.set(key, value);",
+              "const get = key => pm.collectionVariables.get(key);",
+              "const expect = pm.expect;",
+              "const data = pm.response.json();",
+              "",
+              "pm.test('Contrato da resposta', () => {expect(data.status).to.eql(400); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "14 - Categoria inexistente",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/suggestions",
+        "description": "Resultado esperado: HTTP 404.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Mais tomadas na biblioteca 100%_!\",\n  \"content\": \"Instalar tomadas nas mesas de estudo.\",\n  \"author\": \"  Pessoa Exemplo  \",\n  \"courseId\": {{courseId}},\n  \"categoryId\": 9223372036854775807\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 404', () => pm.response.to.have.status(404));",
+              "const set = (key, value) => pm.collectionVariables.set(key, value);",
+              "const get = key => pm.collectionVariables.get(key);",
+              "const expect = pm.expect;",
+              "const data = pm.response.json();",
+              "",
+              "pm.test('Contrato da resposta', () => {expect(data.status).to.eql(404); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "15 - Curso inexistente",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/suggestions",
+        "description": "Resultado esperado: HTTP 404.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Mais tomadas na biblioteca 100%_!\",\n  \"content\": \"Instalar tomadas nas mesas de estudo.\",\n  \"author\": \"  Pessoa Exemplo  \",\n  \"courseId\": 9223372036854775807,\n  \"categoryId\": {{categoryId}}\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 404', () => pm.response.to.have.status(404));",
+              "const set = (key, value) => pm.collectionVariables.set(key, value);",
+              "const get = key => pm.collectionVariables.get(key);",
+              "const expect = pm.expect;",
+              "const data = pm.response.json();",
+              "",
+              "pm.test('Contrato da resposta', () => {expect(data.status).to.eql(404); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "16 - JSON truncado",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/suggestions",
+        "description": "Resultado esperado: HTTP 400.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"title\":",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+              "const set = (key, value) => pm.collectionVariables.set(key, value);",
+              "const get = key => pm.collectionVariables.get(key);",
+              "const expect = pm.expect;",
+              "const data = pm.response.json();",
+              "",
+              "pm.test('Contrato da resposta', () => {expect(data.status).to.eql(400); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "17 - Método não permitido",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/suggestions/{{suggestionId}}",
+        "description": "Resultado esperado: HTTP 405.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Mais tomadas na biblioteca 100%_!\",\n  \"content\": \"Instalar tomadas nas mesas de estudo.\",\n  \"author\": \"  Pessoa Exemplo  \",\n  \"courseId\": {{courseId}},\n  \"categoryId\": {{categoryId}}\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 405', () => pm.response.to.have.status(405));",
+              "const set = (key, value) => pm.collectionVariables.set(key, value);",
+              "const get = key => pm.collectionVariables.get(key);",
+              "const expect = pm.expect;",
+              "const data = pm.response.json();",
+              "",
+              "pm.test('Contrato da resposta', () => {expect(data.status).to.eql(405); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "18 - Tipo de conteúdo inválido",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "text/plain"
+          }
+        ],
+        "url": "{{baseUrl}}/api/suggestions",
+        "description": "Resultado esperado: HTTP 415.",
+        "body": {
+          "mode": "raw",
+          "raw": "texto",
+          "options": {
+            "raw": {
+              "language": "text"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 415', () => pm.response.to.have.status(415));",
+              "const set = (key, value) => pm.collectionVariables.set(key, value);",
+              "const get = key => pm.collectionVariables.get(key);",
+              "const expect = pm.expect;",
+              "const data = pm.response.json();",
+              "",
+              "pm.test('Contrato da resposta', () => {expect(data.status).to.eql(415); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "19 - Excluir sugestão",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": "{{baseUrl}}/api/suggestions/{{suggestionId}}",
+        "description": "Resultado esperado: HTTP 204."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 204', () => pm.response.to.have.status(204));",
+              "const set = (key, value) => pm.collectionVariables.set(key, value);",
+              "const get = key => pm.collectionVariables.get(key);",
+              "const expect = pm.expect;",
+              "pm.test('Sem corpo', () => expect(pm.response.text()).to.eql(''));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "20 - Confirmar exclusão",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/suggestions/{{suggestionId}}",
+        "description": "Resultado esperado: HTTP 404."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 404', () => pm.response.to.have.status(404));",
+              "const set = (key, value) => pm.collectionVariables.set(key, value);",
+              "const get = key => pm.collectionVariables.get(key);",
+              "const expect = pm.expect;",
+              "const data = pm.response.json();",
+              "",
+              "pm.test('Contrato da resposta', () => {expect(data.status).to.eql(404); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "21 - Repetir exclusão",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": "{{baseUrl}}/api/suggestions/{{suggestionId}}",
+        "description": "Resultado esperado: HTTP 404."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 404', () => pm.response.to.have.status(404));",
+              "const set = (key, value) => pm.collectionVariables.set(key, value);",
+              "const get = key => pm.collectionVariables.get(key);",
+              "const expect = pm.expect;",
+              "const data = pm.response.json();",
+              "",
+              "pm.test('Contrato da resposta', () => {expect(data.status).to.eql(404); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "22 - Atualizar excluída",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/suggestions/{{suggestionId}}",
+        "description": "Resultado esperado: HTTP 404.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Mais tomadas na biblioteca 100%_!\",\n  \"content\": \"Instalar tomadas nas mesas de estudo.\",\n  \"author\": \"  Pessoa Exemplo  \",\n  \"courseId\": {{courseId}},\n  \"categoryId\": {{categoryId}}\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 404', () => pm.response.to.have.status(404));",
+              "const set = (key, value) => pm.collectionVariables.set(key, value);",
+              "const get = key => pm.collectionVariables.get(key);",
+              "const expect = pm.expect;",
+              "const data = pm.response.json();",
+              "",
+              "pm.test('Contrato da resposta', () => {expect(data.status).to.eql(404); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "23 - OpenAPI JSON",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/v3/api-docs",
+        "description": "Resultado esperado: HTTP 200."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "const set = (key, value) => pm.collectionVariables.set(key, value);",
+              "const get = key => pm.collectionVariables.get(key);",
+              "const expect = pm.expect;",
+              "const data = pm.response.json();",
+              "",
+              "pm.test('Contrato da resposta', () => {expect(data.paths).to.have.property('/api/suggestions');});"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
