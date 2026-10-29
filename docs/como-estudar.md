@@ -36,7 +36,7 @@ por exemplo, pertence ao pacote
 | 05 | Validação e erros HTTP uniformes | Sim |
 | 06 | Swagger e OpenAPI | Sim |
 | 07 | API completa sem autenticação, testes e collections | Sim |
-| 08 | Administrador BCrypt e permissões via Basic intermediário | Sim |
+| 08 | Conta no PostgreSQL, setup e permissões via Basic intermediário | Sim |
 | 09 | Login administrativo e Bearer JWT | Sim |
 
 Antes de 05, os erros ainda não seguem o contrato final. Antes de 04, o GET de

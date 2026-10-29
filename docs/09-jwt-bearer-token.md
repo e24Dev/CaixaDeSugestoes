@@ -4,59 +4,95 @@
 
 ## Missão
 
-Continuar o módulo 08 e substituir Basic por um login que emite JWT somente para
-o administrador. O checkpoint `09-jwt-bearer-token-impl` é a versão final protegida.
-A etapa 07 permanece como API completa sem autenticação.
+Continue o módulo 08 com a conta já cadastrada no PostgreSQL. Substitua Basic
+por POST `/api/auth/login` e Bearer JWT. A versão final é
+`09-jwt-bearer-token-impl`; a 07 preserva a API sem autenticação.
 
-| Operação | Acesso final |
+| Operação | Acesso |
 | --- | --- |
 | GET sugestões, detalhe, cursos e categorias | Público |
-| POST de sugestão, inclusive anônima | Público |
-| POST `/api/auth/login` | Recebe credenciais e emite token somente para o administrador |
-| PUT e DELETE de sugestão | JWT válido com papel ADMIN |
+| POST sugestão, inclusive anônima | Público |
+| POST auth/login | Emite token somente para administrador ativo cadastrado |
+| PUT/DELETE sugestão | JWT válido, papel ADMIN e conta ainda ativa |
 
-Não há cadastro público, refresh token nem rota de logout no servidor. O autor
-informado na sugestão não é uma identidade autenticada e não recebe permissões.
-
-## Entenda a credencial
-
-**JWT** é o formato do token assinado. **Bearer** é como apresentá-lo na chamada:
-`Authorization: Bearer <accessToken>`. Base64 não criptografa o conteúdo do JWT;
-nenhuma senha ou hash deve estar nas claims. Quem possui o token pode usá-lo
-até sua expiração, por isso ele não deve ser compartilhado ou versionado.
+JWT é o formato da credencial assinada. Bearer é o esquema de apresentação no
+header `Authorization: Bearer <accessToken>`. As claims não são criptografadas;
+nenhuma senha ou hash deve ser incluído. Não há cadastro público, refresh token
+ou revogação individual nesta etapa.
 
 ```mermaid
 sequenceDiagram
     actor Admin as Administrador
-    participant Cliente as Insomnia ou cliente web Java
+    participant Cliente as Insomnia ou cliente Java
     participant Login as AdminAuthController
     participant Senha as AuthenticationManager e BCrypt
+    participant Banco as PostgreSQL
     participant JWT as JwtEncoder
-    Admin->>Cliente: Informar username e password
-    Cliente->>Login: POST /api/auth/login com JSON
-    Login->>Senha: Autenticar credenciais
-    alt Credenciais inválidas
-        Senha-->>Login: Falha de autenticação
-        Login-->>Cliente: 401 e ApiError genérico
-    else Administrador válido
-        Senha-->>Login: Identidade com ROLE_ADMIN
-        Login->>JWT: Assinar claims com HS256
-        JWT-->>Login: JWT assinado e com expiração
+    Admin->>Cliente: Informar usuário e senha escolhidos no setup
+    Cliente->>Login: POST /api/auth/login
+    Login->>Senha: Autenticar
+    Senha->>Banco: Buscar conta pelo username único
+    Banco-->>Senha: Hash e estado ativo
+    alt Credencial inválida ou conta inativa
+        Senha-->>Login: Falha
+        Login-->>Cliente: 401 genérico
+    else Administrador ativo e senha correta
+        Senha-->>Login: ROLE_ADMIN
+        Login->>JWT: Assinar claims com expiração
+        JWT-->>Login: JWT assinado
         Login-->>Cliente: 200 com accessToken, tokenType e expiresIn
     end
 ```
 
-**Leitura:** a senha é verificada no login; as chamadas seguintes apresentam o
-token. Uma senha incorreta e um username inexistente produzem a mesma mensagem.
+## 1. Chave automática e persistente
 
-## 1. Adicione Resource Server
+A aplicação cria uma chave aleatória de 32 bytes em `.local/jwt-signing.key` na
+primeira inicialização e reutiliza esse arquivo nos próximos boots. Ele não contém
+senha de administrador e fica fora do Git. Em sistemas POSIX, o arquivo nasce com
+permissão 600; a pasta nova, 700. Um bloqueio de arquivo serializa inicializações
+concorrentes. Uma chave existente inválida causa erro, sem sobrescrita silenciosa.
 
-Spring Security valida o Bearer por seu próprio filtro e `JwtDecoder`. Não crie
-um filtro JWT manual. Continue usando o administrador BCrypt da etapa anterior.
+Se já usava JWT_SECRET_BASE64, essa configuração continua tendo prioridade. Para
+implantação, configure JWT_KEY_FILE em armazenamento privado e persistente ou
+forneça uma chave pelo gestor de segredos. Réplicas precisam compartilhar a mesma
+chave; não use o arquivo local de um container descartável sem volume persistente.
+
+```mermaid
+flowchart TD
+    Inicio["Inicializar API"] --> Externa{"JWT_SECRET_BASE64 definido?"}
+    Externa -->|"Sim"| Validar["Validar chave externa"]
+    Externa -->|"Não"| Arquivo{"Arquivo privado existe?"}
+    Arquivo -->|"Não"| Criar["Gerar 32 bytes aleatórios e gravar"]
+    Arquivo -->|"Sim"| Ler["Reutilizar chave existente"]
+    Criar --> JWT["Assinar e verificar JWT com HS256"]
+    Ler --> JWT
+    Validar --> JWT
+```
+
+Não é necessário executar os auxiliares de geração de hash/chave para iniciar.
+A conta vem do banco; a chave é mantida separadamente no arquivo privado.
+
+## 2. Arquivos alterados desde o checkpoint 08
+
+Adicione Resource Server e aplique os arquivos completos abaixo. O decoder do
+Spring Security valida o token; não crie um filtro JWT manual.
+
+Claims: iss=`caixa-de-sugestoes`, aud inclui `caixa-de-sugestoes-api`, sub é o
+username de uma conta existente e ativa, iat/exp são obrigatórios e roles contém
+ADMIN nos tokens emitidos. A validade padrão é 900 segundos; JWT_TTL_SECONDS
+aceita 60–3600. A emissão admite iat até 30 segundos no futuro; exp não tem
+carência após expirar. A validação consulta a conta por seu índice único e rejeita
+uma conta removida ou desativada, inclusive para token emitido anteriormente.
+
+**Exclua os arquivos abaixo**, que pertenciam ao mecanismo Basic:
+
+- `src/test/java/br/com/etecalbertoferes/CaixaDeSugestoes/BasicSecurityIntegrationTest.java`
+
+Não mantenha seus testes de Basic habilitados como se ele continuasse autenticando.
 
 ### `build.gradle`
 
-Crie ou substitua o arquivo completo.
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
 
 <!-- arquivo: build.gradle -->
 ```groovy
@@ -88,31 +124,42 @@ dependencies {
 tasks.named('test') { useJUnitPlatform() }
 ```
 
-## 2. Emissão e validação das claims
+### `src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/CaixaDeSugestoesApplication.java`
 
-A assinatura usa HS256 com chave aleatória de pelo menos 32 bytes, recebida em
-Base64 pelo ambiente. A duração padrão é 900 segundos; `JWT_TTL_SECONDS` aceita
-60 a 3600. A chave não é gerada automaticamente em cada boot: preservá-la permite
-que tokens não expirados continuem válidos após reinício.
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
 
-| Claim | Valor ou regra |
-| --- | --- |
-| iss | `caixa-de-sugestoes` |
-| aud | Inclui `caixa-de-sugestoes-api` |
-| sub | Username do administrador configurado |
-| iat | Obrigatório; admite até 30 segundos no futuro para emissão |
-| exp | Expiração obrigatória, sem tolerância após expirar |
-| jti | Identificador aleatório do token emitido |
-| roles | Emissão somente com `ADMIN` |
+<!-- arquivo: src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/CaixaDeSugestoesApplication.java -->
+```java
+package br.com.etecalbertoferes.CaixaDeSugestoes;
 
-O decoder verifica algoritmo, assinatura, tempo, emissor, audiência e subject.
-`roles` é convertido para authorities `ROLE_...`; um token válido sem ADMIN
-recebe 403. A API não emite esse token de outro papel; o cenário existe no teste
-para comprovar a autorização.
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class CaixaDeSugestoesApplication {
+    public static void main(String[] args) {
+        if (args.length == 1 && "--setup-admin".equals(args[0])) {
+            br.com.etecalbertoferes.CaixaDeSugestoes.infrastructure.security.AdminSetupCommand.run();
+            return;
+        }
+        if (args.length == 1 && "--generate-admin-password-hash".equals(args[0])) {
+            br.com.etecalbertoferes.CaixaDeSugestoes.infrastructure.security.AdminPasswordHash.generate();
+            return;
+        }
+        if (args.length == 1 && "--generate-jwt-secret".equals(args[0])) {
+            byte[] key = new byte[32];
+            new java.security.SecureRandom().nextBytes(key);
+            System.out.println(java.util.Base64.getEncoder().encodeToString(key));
+            return;
+        }
+        SpringApplication.run(CaixaDeSugestoesApplication.class, args);
+    }
+}
+```
 
 ### `src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/application/AdminAuthenticationService.java`
 
-Crie ou substitua o arquivo completo.
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
 
 <!-- arquivo: src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/application/AdminAuthenticationService.java -->
 ```java
@@ -156,9 +203,46 @@ public class AdminAuthenticationService {
 }
 ```
 
+### `src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/infrastructure/security/AdminPasswordHash.java`
+
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
+
+<!-- arquivo: src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/infrastructure/security/AdminPasswordHash.java -->
+```java
+package br.com.etecalbertoferes.CaixaDeSugestoes.infrastructure.security;
+
+import java.io.Console;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+
+public final class AdminPasswordHash {
+    private AdminPasswordHash() {
+    }
+
+    public static void generate() {
+        Console console = System.console();
+        if (console == null)
+            throw new IllegalStateException(
+                    "Execute em terminal interativo: java -jar ... --generate-admin-password-hash");
+        char[] password = console.readPassword("Senha administrativa (mínimo 12 caracteres): ");
+        if (password == null)
+            throw new IllegalStateException("Leitura cancelada");
+        try {
+            String value = new String(password);
+            if (password.length < 12 || value.getBytes(StandardCharsets.UTF_8).length > 72)
+                throw new IllegalArgumentException("Use ao menos 12 caracteres e no máximo 72 bytes UTF-8");
+            console.printf("%s%n", new BCryptPasswordEncoder(12).encode(value));
+        } finally {
+            Arrays.fill(password, '\0');
+        }
+    }
+}
+```
+
 ### `src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/infrastructure/security/JwtConfiguration.java`
 
-Crie ou substitua o arquivo completo.
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
 
 <!-- arquivo: src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/infrastructure/security/JwtConfiguration.java -->
 ```java
@@ -172,6 +256,8 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import org.springframework.context.annotation.*;
 import org.springframework.core.env.Environment;
+import java.nio.file.Path;
+import br.com.etecalbertoferes.CaixaDeSugestoes.domain.AdminAccountRepository;
 import org.springframework.security.oauth2.core.*;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.*;
@@ -179,62 +265,105 @@ import br.com.etecalbertoferes.CaixaDeSugestoes.application.AdminAuthenticationS
 
 @Configuration
 public class JwtConfiguration {
-    @Bean SecretKey jwtSigningKey(Environment env) {
+    @Bean
+    SecretKey jwtSigningKey(Environment env) {
         byte[] decoded;
-        try { decoded = Base64.getDecoder().decode(env.getRequiredProperty("app.jwt.secret-base64")); }
-        catch (IllegalArgumentException ex) { throw new IllegalStateException("Configure JWT_SECRET_BASE64 com uma chave Base64 válida"); }
-        if (decoded.length < 32) throw new IllegalStateException("JWT_SECRET_BASE64 deve representar pelo menos 32 bytes aleatórios");
+        try {
+            String configured = env.getProperty("app.jwt.secret-base64", "");
+            String secret = configured.isBlank()
+                ? JwtKeyStore.loadOrCreate(Path.of(env.getProperty("app.jwt.key-file", ".local/jwt-signing.key")))
+                : configured;
+            decoded = Base64.getDecoder().decode(secret);
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalStateException("Configure JWT_SECRET_BASE64 com uma chave Base64 válida");
+        }
+        if (decoded.length < 32)
+            throw new IllegalStateException("JWT_SECRET_BASE64 deve representar pelo menos 32 bytes aleatórios");
         return new SecretKeySpec(decoded, "HmacSHA256");
     }
-    @Bean JwtEncoder jwtEncoder(SecretKey key) {
+
+    @Bean
+    JwtEncoder jwtEncoder(SecretKey key) {
         return NimbusJwtEncoder.withSecretKey(key).algorithm(MacAlgorithm.HS256).build();
     }
-    @Bean JwtDecoder jwtDecoder(SecretKey key, Environment env) {
+
+    @Bean
+    JwtDecoder jwtDecoder(SecretKey key, AdminAccountRepository accounts) {
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(key).macAlgorithm(MacAlgorithm.HS256).build();
         OAuth2TokenValidator<Jwt> requiredTimes = jwt -> {
-            if (jwt.getExpiresAt() == null || jwt.getIssuedAt() == null || jwt.getIssuedAt().isAfter(Instant.now().plusSeconds(30)))
-                return OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token", "Claims temporais inválidas", null));
+            if (jwt.getExpiresAt() == null || jwt.getIssuedAt() == null
+                    || jwt.getIssuedAt().isAfter(Instant.now().plusSeconds(30)))
+                return OAuth2TokenValidatorResult
+                        .failure(new OAuth2Error("invalid_token", "Claims temporais inválidas", null));
             return OAuth2TokenValidatorResult.success();
         };
         decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
-            new JwtTimestampValidator(Duration.ZERO),
-            new JwtIssuerValidator(AdminAuthenticationService.ISSUER),
-            new JwtClaimValidator<List<String>>(JwtClaimNames.AUD, aud -> aud != null && aud.contains(AdminAuthenticationService.AUDIENCE)),
-            new JwtClaimValidator<String>(JwtClaimNames.SUB, env.getRequiredProperty("app.admin.username")::equals),
-            requiredTimes));
+                new JwtTimestampValidator(Duration.ZERO),
+                new JwtIssuerValidator(AdminAuthenticationService.ISSUER),
+                new JwtClaimValidator<List<String>>(JwtClaimNames.AUD,
+                        aud -> aud != null && aud.contains(AdminAuthenticationService.AUDIENCE)),
+                new JwtClaimValidator<String>(JwtClaimNames.SUB, subject -> subject != null &&
+                    accounts.findByUsername(subject).filter(account -> account.active()).isPresent()),
+                requiredTimes));
         return decoder;
     }
 }
 ```
 
-## 3. Substitua Basic pela autorização Bearer
+### `src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/infrastructure/security/JwtKeyStore.java`
 
-O filtro de recurso usa o decoder e os handlers de erro anteriores. A aplicação
-não habilita Basic nem formulário de login, não cria sessão e não autentica por
-cookies. Por usar exclusivamente Bearer explícito nas operações administrativas,
-CSRF está desabilitado nesta API. Isso não é uma configuração para copiar no
-futuro projeto Thymeleaf, cuja sessão de navegador precisará de proteção CSRF.
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
 
-```mermaid
-flowchart TD
-    Request["PUT ou DELETE de sugestão"] --> Header{"Bearer apresentado?"}
-    Header -->|"Não"| Unauthorized["401 e WWW-Authenticate: Bearer"]
-    Header -->|"Sim"| Valida{"Assinatura, algoritmo, claims<br/>e expiração válidos?"}
-    Valida -->|"Não"| Unauthorized
-    Valida -->|"Sim"| Role{"Papel ADMIN?"}
-    Role -->|"Não"| Forbidden["403 e ApiError"]
-    Role -->|"Sim"| Operacao["Controller e serviço executam a operação"]
-    Operacao --> Negocio["200 ou 204; 400 ou 404 conforme o contrato"]
+<!-- arquivo: src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/infrastructure/security/JwtKeyStore.java -->
+```java
+package br.com.etecalbertoferes.CaixaDeSugestoes.infrastructure.security;
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.security.SecureRandom;
+import java.util.Base64;
+import java.util.Set;
+
+public final class JwtKeyStore {
+    private JwtKeyStore() {}
+    public static synchronized String loadOrCreate(Path path) {
+        try {
+            Path absolute = path.toAbsolutePath();
+            boolean posix = absolute.getFileSystem().supportedFileAttributeViews().contains("posix");
+            if (posix) Files.createDirectories(absolute.getParent(), PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));
+            else Files.createDirectories(absolute.getParent());
+            var options = Set.of(StandardOpenOption.CREATE, StandardOpenOption.READ, StandardOpenOption.WRITE);
+            try (FileChannel channel = posix
+                    ? FileChannel.open(absolute, options, PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")))
+                    : FileChannel.open(absolute, options);
+                 var lock = channel.lock()) {
+                if (channel.size() == 0) {
+                    byte[] bytes = new byte[32]; new SecureRandom().nextBytes(bytes);
+                    byte[] text = Base64.getEncoder().encode(bytes);
+                    ByteBuffer buffer = ByteBuffer.wrap(text);
+                    while (buffer.hasRemaining()) channel.write(buffer);
+                    channel.force(true);
+                }
+                if (channel.size() > 8192) throw new IllegalStateException("Arquivo de chave JWT inválido");
+                channel.position(0);
+                ByteBuffer buffer = ByteBuffer.allocate((int) channel.size());
+                while (buffer.hasRemaining() && channel.read(buffer) != -1) { }
+                return new String(buffer.array(), StandardCharsets.US_ASCII).strip();
+            }
+        } catch (IOException ex) {
+            throw new IllegalStateException("Não foi possível ler ou gravar a chave JWT; configure JWT_KEY_FILE em uma pasta gravável", ex);
+        }
+    }
+}
 ```
-
-Sem token, a requisição é rejeitada antes de validar o corpo ou consultar o ID.
-Com autenticação válida, o contrato de negócio continua igual. Enviar um Bearer
-inválido mesmo em uma rota pública resulta em 401; chamadas públicas devem omitir
-o header quando não precisam de autenticação.
 
 ### `src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/infrastructure/security/SecurityConfiguration.java`
 
-Crie ou substitua o arquivo completo.
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
 
 <!-- arquivo: src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/infrastructure/security/SecurityConfiguration.java -->
 ```java
@@ -248,9 +377,11 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.server.resource.authentication.*;
 import org.springframework.security.web.SecurityFilterChain;
 
+@org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication
 @Configuration
 public class SecurityConfiguration {
-    @Bean SecurityFilterChain apiSecurity(HttpSecurity http, SecurityErrorWriter errors) throws Exception {
+    @Bean
+    SecurityFilterChain apiSecurity(HttpSecurity http, SecurityErrorWriter errors) throws Exception {
         JwtGrantedAuthoritiesConverter authorities = new JwtGrantedAuthoritiesConverter();
         authorities.setAuthoritiesClaimName("roles");
         authorities.setAuthorityPrefix("ROLE_");
@@ -260,54 +391,65 @@ public class SecurityConfiguration {
             res.setHeader("WWW-Authenticate", "Bearer");
             errors.write(req, res, 401, "Autenticação necessária ou token inválido");
         };
-        var forbidden = (org.springframework.security.web.access.AccessDeniedHandler) (req, res, cause) ->
-            errors.write(req, res, 403, "Acesso negado");
+        var forbidden = (org.springframework.security.web.access.AccessDeniedHandler) (req, res, cause) -> errors
+                .write(req, res, 403, "Acesso negado");
         return http
-            .csrf(csrf -> csrf.disable())
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .requestCache(cache -> cache.disable())
-            .authorizeHttpRequests(auth -> auth
-                .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-                .requestMatchers(HttpMethod.PUT, "/api/suggestions/*").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.DELETE, "/api/suggestions/*").hasRole("ADMIN")
-                .anyRequest().permitAll())
-            .oauth2ResourceServer(resource -> resource
-                .jwt(jwt -> jwt.jwtAuthenticationConverter(converter))
-                .authenticationEntryPoint(unauthorized).accessDeniedHandler(forbidden))
-            .exceptionHandling(ex -> ex.authenticationEntryPoint(unauthorized).accessDeniedHandler(forbidden))
-            .build();
+                .csrf(csrf -> csrf.disable())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .requestCache(cache -> cache.disable())
+                .authorizeHttpRequests(auth -> auth
+                        .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
+                        .requestMatchers(HttpMethod.PUT, "/api/suggestions/*").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/suggestions/*").hasRole("ADMIN")
+                        .anyRequest().permitAll())
+                .oauth2ResourceServer(resource -> resource
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(converter))
+                        .authenticationEntryPoint(unauthorized).accessDeniedHandler(forbidden))
+                .exceptionHandling(ex -> ex.authenticationEntryPoint(unauthorized).accessDeniedHandler(forbidden))
+                .build();
     }
 }
 ```
 
-## 4. Crie o endpoint de login
+### `src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/infrastructure/security/SecurityErrorWriter.java`
 
-O DTO valida entrada, mas não registra credenciais no toString. O controller
-devolve `Cache-Control: no-store` e `Pragma: no-cache`. O advice converte falha de
-autenticação em 401 genérico, sem distingui-la por usuário existente/inexistente.
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
 
-### `src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/interfaces/rest/AdminLoginRequest.java`
-
-Crie ou substitua o arquivo completo.
-
-<!-- arquivo: src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/interfaces/rest/AdminLoginRequest.java -->
+<!-- arquivo: src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/infrastructure/security/SecurityErrorWriter.java -->
 ```java
-package br.com.etecalbertoferes.CaixaDeSugestoes.interfaces.rest;
+package br.com.etecalbertoferes.CaixaDeSugestoes.infrastructure.security;
 
-import jakarta.validation.constraints.*;
-import io.swagger.v3.oas.annotations.media.Schema;
-public record AdminLoginRequest(
-    @NotBlank(message = "Usuário é obrigatório") @Size(max = 100, message = "Usuário deve ter no máximo 100 caracteres")
-    @Schema(example = "administrador") String username,
-    @NotBlank(message = "Senha é obrigatória") @Size(max = 72, message = "Senha deve ter no máximo 72 caracteres")
-    @Schema(format = "password", accessMode = Schema.AccessMode.WRITE_ONLY) String password) {
-    @Override public String toString() { return "AdminLoginRequest[credenciais protegidas]"; }
+import java.io.IOException;
+import java.time.Instant;
+import java.util.Map;
+import jakarta.servlet.http.*;
+import org.springframework.http.MediaType;
+import org.springframework.stereotype.Component;
+import tools.jackson.databind.ObjectMapper;
+import br.com.etecalbertoferes.CaixaDeSugestoes.interfaces.rest.ApiError;
+
+@Component
+public class SecurityErrorWriter {
+    private final ObjectMapper mapper;
+
+    public SecurityErrorWriter(ObjectMapper mapper) {
+        this.mapper = mapper;
+    }
+
+    public void write(HttpServletRequest request, HttpServletResponse response, int status, String message)
+            throws IOException {
+        response.setStatus(status);
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.setCharacterEncoding("UTF-8");
+        mapper.writeValue(response.getOutputStream(),
+                new ApiError(Instant.now(), status, message, request.getRequestURI(), Map.of()));
+    }
 }
 ```
 
 ### `src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/interfaces/rest/AdminAuthController.java`
 
-Crie ou substitua o arquivo completo.
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
 
 <!-- arquivo: src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/interfaces/rest/AdminAuthController.java -->
 ```java
@@ -327,7 +469,11 @@ import br.com.etecalbertoferes.CaixaDeSugestoes.application.AdminAuthenticationS
 @Tag(name = "Administração", description = "Login exclusivo do administrador; sem cadastro público")
 public class AdminAuthController {
     private final AdminAuthenticationService service;
-    public AdminAuthController(AdminAuthenticationService service) { this.service = service; }
+
+    public AdminAuthController(AdminAuthenticationService service) {
+        this.service = service;
+    }
+
     @PostMapping(value = "/login", consumes = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "Autenticar administrador e emitir JWT", description = "Envie username e password. accessToken deve ser apresentado como Authorization: Bearer <token>. Expiração em segundos; não há refresh nem revogação individual nesta etapa.")
     @ApiResponse(responseCode = "200", description = "Token emitido")
@@ -335,14 +481,33 @@ public class AdminAuthController {
     @ApiResponse(responseCode = "401", description = "Credenciais inválidas", content = @Content(schema = @Schema(implementation = ApiError.class)))
     public ResponseEntity<AdminAuthenticationService.AccessToken> login(@Valid @RequestBody AdminLoginRequest request) {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).header(HttpHeaders.PRAGMA, "no-cache")
-            .body(service.login(request.username(), request.password()));
+                .body(service.login(request.username(), request.password()));
     }
+}
+```
+
+### `src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/interfaces/rest/AdminLoginRequest.java`
+
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
+
+<!-- arquivo: src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/interfaces/rest/AdminLoginRequest.java -->
+```java
+package br.com.etecalbertoferes.CaixaDeSugestoes.interfaces.rest;
+
+import jakarta.validation.constraints.*;
+import io.swagger.v3.oas.annotations.media.Schema;
+public record AdminLoginRequest(
+    @NotBlank(message = "Usuário é obrigatório") @Size(max = 100, message = "Usuário deve ter no máximo 100 caracteres")
+    @Schema(example = "administrador") String username,
+    @NotBlank(message = "Senha é obrigatória") @Size(max = 72, message = "Senha deve ter no máximo 72 caracteres")
+    @Schema(format = "password", accessMode = Schema.AccessMode.WRITE_ONLY) String password) {
+    @Override public String toString() { return "AdminLoginRequest[credenciais protegidas]"; }
 }
 ```
 
 ### `src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/interfaces/rest/ApiExceptionHandler.java`
 
-Crie ou substitua o arquivo completo.
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
 
 <!-- arquivo: src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/interfaces/rest/ApiExceptionHandler.java -->
 ```java
@@ -366,6 +531,7 @@ import br.com.etecalbertoferes.CaixaDeSugestoes.domain.ResourceNotFoundException
 @RestControllerAdvice
 public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
+
     @Override
     protected ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException ex,
             HttpHeaders headers, HttpStatusCode status, WebRequest request) {
@@ -373,16 +539,19 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         ex.getBindingResult().getFieldErrors().forEach(e -> fields.putIfAbsent(e.getField(), e.getDefaultMessage()));
         return respond(status, "Dados inválidos", fields, headers, request);
     }
+
     @Override
     protected ResponseEntity<Object> handleHandlerMethodValidationException(HandlerMethodValidationException ex,
             HttpHeaders headers, HttpStatusCode status, WebRequest request) {
         Map<String, String> fields = new LinkedHashMap<>();
         ex.getParameterValidationResults().forEach(result -> {
             String name = result.getMethodParameter().getParameterName();
-            result.getResolvableErrors().forEach(error -> fields.putIfAbsent(name == null ? "id" : name, error.getDefaultMessage()));
+            result.getResolvableErrors()
+                    .forEach(error -> fields.putIfAbsent(name == null ? "id" : name, error.getDefaultMessage()));
         });
         return respond(status, "Dados inválidos", fields, headers, request);
     }
+
     @Override
     protected ResponseEntity<Object> handleExceptionInternal(Exception ex, Object body, HttpHeaders headers,
             HttpStatusCode status, WebRequest request) {
@@ -396,6 +565,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         };
         return respond(status, message, Map.of(), headers, request);
     }
+
     @ExceptionHandler(org.springframework.security.core.AuthenticationException.class)
     public ResponseEntity<Object> invalidCredentials(WebRequest request) {
         HttpHeaders headers = new HttpHeaders();
@@ -403,75 +573,210 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         headers.setCacheControl("no-store");
         return respond(HttpStatus.UNAUTHORIZED, "Credenciais inválidas", Map.of(), headers, request);
     }
+
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<Object> notFound(ResourceNotFoundException ex, WebRequest request) {
         return respond(HttpStatus.NOT_FOUND, ex.getMessage(), Map.of(), new HttpHeaders(), request);
     }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Object> unexpected(Exception ex, WebRequest request) {
         if (ex instanceof ErrorResponse error) {
             return respond(error.getStatusCode(), "Requisição inválida", Map.of(), error.getHeaders(), request);
         }
         log.error("Falha inesperada ao processar requisição", ex);
-        return respond(HttpStatus.INTERNAL_SERVER_ERROR, "Erro interno do servidor", Map.of(), new HttpHeaders(), request);
+        return respond(HttpStatus.INTERNAL_SERVER_ERROR, "Erro interno do servidor", Map.of(), new HttpHeaders(),
+                request);
     }
+
     private ResponseEntity<Object> respond(HttpStatusCode status, String message, Map<String, String> fields,
             HttpHeaders headers, WebRequest request) {
         HttpServletRequest servlet = ((ServletWebRequest) request).getRequest();
-        return new ResponseEntity<>(new ApiError(Instant.now(), status.value(), message, servlet.getRequestURI(), fields), headers, status);
+        return new ResponseEntity<>(
+                new ApiError(Instant.now(), status.value(), message, servlet.getRequestURI(), fields), headers, status);
     }
 }
 ```
 
-Request de login, preenchido somente no cliente local:
+### `src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/interfaces/rest/CatalogController.java`
 
-```json
-{
-  "username": "administrador",
-  "password": "SUA_SENHA_LOCAL"
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
+
+<!-- arquivo: src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/interfaces/rest/CatalogController.java -->
+```java
+package br.com.etecalbertoferes.CaixaDeSugestoes.interfaces.rest;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.List;
+import org.springframework.web.bind.annotation.*;
+import br.com.etecalbertoferes.CaixaDeSugestoes.application.CatalogService;
+import br.com.etecalbertoferes.CaixaDeSugestoes.domain.*;
+
+@Tag(name = "Catálogos", description = "Cursos e categorias didáticos, ordenados por nome; somente consulta")
+@RestController
+@RequestMapping("/api")
+public class CatalogController {
+    private final CatalogService service;
+
+    public CatalogController(CatalogService service) {
+        this.service = service;
+    }
+
+    @Operation(summary = "Listar cursos", description = "Array de id/name ordenado por name crescente")
+    @GetMapping("/courses")
+    public List<Course> courses() {
+        return service.courses();
+    }
+
+    @Operation(summary = "Listar categorias", description = "Array de id/name ordenado por name crescente")
+    @GetMapping("/categories")
+    public List<Category> categories() {
+        return service.categories();
+    }
 }
 ```
 
-Response: `accessToken` contém o JWT, `tokenType` é `Bearer` e `expiresIn` é a
-validade em segundos. Não existe identidade autenticada para o público geral.
+### `src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/interfaces/rest/OpenApiConfiguration.java`
 
-## 5. Prepare as variáveis e execute
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
 
-Mantenha `ADMIN_USERNAME` e `ADMIN_PASSWORD_HASH` configurados conforme 08.
-O modo auxiliar abaixo gera somente a chave, sem iniciar banco ou Spring.
-
-### `src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/CaixaDeSugestoesApplication.java`
-
-Crie ou substitua o arquivo completo.
-
-<!-- arquivo: src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/CaixaDeSugestoesApplication.java -->
+<!-- arquivo: src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/interfaces/rest/OpenApiConfiguration.java -->
 ```java
-package br.com.etecalbertoferes.CaixaDeSugestoes;
+package br.com.etecalbertoferes.CaixaDeSugestoes.interfaces.rest;
 
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.info.Info;
+import org.springframework.context.annotation.*;
 
-@SpringBootApplication
-public class CaixaDeSugestoesApplication {
-    public static void main(String[] args) {
-        if (args.length == 1 && "--generate-admin-password-hash".equals(args[0])) {
-            br.com.etecalbertoferes.CaixaDeSugestoes.infrastructure.security.AdminPasswordHash.generate();
-            return;
-        }
-        if (args.length == 1 && "--generate-jwt-secret".equals(args[0])) {
-            byte[] key = new byte[32];
-            new java.security.SecureRandom().nextBytes(key);
-            System.out.println(java.util.Base64.getEncoder().encodeToString(key));
-            return;
-        }
-        SpringApplication.run(CaixaDeSugestoesApplication.class, args);
+@Configuration
+public class OpenApiConfiguration {
+    @Bean
+    OpenAPI api() {
+        return new OpenAPI().components(new io.swagger.v3.oas.models.Components().addSecuritySchemes("bearerAuth",
+                new io.swagger.v3.oas.models.security.SecurityScheme()
+                        .type(io.swagger.v3.oas.models.security.SecurityScheme.Type.HTTP).scheme(
+                                "bearer")
+                        .bearerFormat("JWT")))
+                .info(new Info().title("Caixa de Sugestões — Etec Prefeito Alberto Feres")
+                        .version("2.0.0").description(
+                                "API de sugestões para consumo pelo projeto web com Thymeleaf. Catálogos didáticos somente para consulta. Datas em UTC."));
+    }
+}
+```
+
+### `src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/interfaces/rest/SuggestionController.java`
+
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
+
+<!-- arquivo: src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/interfaces/rest/SuggestionController.java -->
+```java
+package br.com.etecalbertoferes.CaixaDeSugestoes.interfaces.rest;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.responses.*;
+import io.swagger.v3.oas.annotations.media.*;
+import java.net.URI;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
+import java.util.List;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import br.com.etecalbertoferes.CaixaDeSugestoes.application.SuggestionService;
+
+@Tag(name = "Sugestões", description = "Cadastro, consulta, substituição e exclusão de sugestões")
+@RestController
+@RequestMapping("/api/suggestions")
+@ApiResponses({
+        @ApiResponse(responseCode = "400", description = "Dados, ID ou filtro inválido", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "404", description = "Sugestão, curso ou categoria não encontrado", content = @Content(schema = @Schema(implementation = ApiError.class))),
+        @ApiResponse(responseCode = "500", description = "Erro interno", content = @Content(schema = @Schema(implementation = ApiError.class)))
+})
+public class SuggestionController {
+    private final SuggestionService service;
+
+    public SuggestionController(SuggestionService service) {
+        this.service = service;
+    }
+
+    @Operation(summary = "Listar sugestões", description = "Array sem paginação. Filtros combinados por AND; q busca título OU conteúdo sem distinguir maiúsculas. Espaços externos são removidos; vazio é ignorado. %, _ e ! são literais. Ordem: createdAt e id decrescentes. IDs positivos inexistentes retornam [].")
+    @ApiResponse(responseCode = "200", description = "Lista de sugestões, inclusive vazia")
+    @GetMapping
+    public List<SuggestionResponse> list(
+            @Parameter(description = "ID positivo do curso") @RequestParam(required = false) @Positive(message = "ID deve ser positivo") Long courseId,
+            @Parameter(description = "ID positivo da categoria") @RequestParam(required = false) @Positive(message = "ID deve ser positivo") Long categoryId,
+            @Parameter(description = "Trecho literal do título ou conteúdo") @RequestParam(required = false) String q) {
+        return service.list(courseId, categoryId, q).stream().map(SuggestionResponse::from).toList();
+    }
+
+    @Operation(summary = "Consultar sugestão por ID")
+    @ApiResponse(responseCode = "200", description = "Sugestão encontrada")
+    @GetMapping("/{id}")
+    public SuggestionResponse get(@PathVariable @Positive(message = "ID deve ser positivo") Long id) {
+        return SuggestionResponse.from(service.get(id));
+    }
+
+    @Operation(summary = "Criar sugestão", description = "O servidor gera id e createdAt. Autor ausente, nulo ou em branco é armazenado como null e devolvido como Anônimo. Consulte os IDs dos catálogos antes de enviar.")
+    @ApiResponse(responseCode = "201", description = "Sugestão criada; Location contém /api/suggestions/{id}", content = @Content(schema = @Schema(implementation = SuggestionResponse.class)), headers = @io.swagger.v3.oas.annotations.headers.Header(name = "Location", schema = @Schema(type = "string")))
+    @PostMapping
+    public ResponseEntity<SuggestionResponse> create(@Valid @RequestBody SuggestionRequest request) {
+        SuggestionResponse response = SuggestionResponse.from(service.create(request.command()));
+        return ResponseEntity.created(URI.create("/api/suggestions/" + response.id())).body(response);
+    }
+
+    @Operation(summary = "Substituir campos editáveis", description = "Preserva id e createdAt. Omitir author remove o nome anterior. Curso e categoria são obrigatórios. Falhas não alteram o registro.")
+    @ApiResponse(responseCode = "200", description = "Sugestão atualizada")
+    @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "bearerAuth")
+    @ApiResponse(responseCode = "401", description = "Autenticação necessária", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "403", description = "Acesso negado", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @PutMapping("/{id}")
+    public SuggestionResponse update(@PathVariable @Positive(message = "ID deve ser positivo") Long id,
+            @Valid @RequestBody SuggestionRequest request) {
+        return SuggestionResponse.from(service.update(id, request.command()));
+    }
+
+    @Operation(summary = "Excluir sugestão", description = "Exclusão física, preservando curso e categoria. Repetir a exclusão retorna 404.")
+    @ApiResponse(responseCode = "204", description = "Excluída, sem corpo", content = @Content)
+    @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "bearerAuth")
+    @ApiResponse(responseCode = "401", description = "Autenticação necessária", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = "403", description = "Acesso negado", content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable @Positive(message = "ID deve ser positivo") Long id) {
+        service.delete(id);
+        return ResponseEntity.noContent().build();
+    }
+}
+```
+
+### `src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/interfaces/rest/SuggestionRequest.java`
+
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
+
+<!-- arquivo: src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/interfaces/rest/SuggestionRequest.java -->
+```java
+package br.com.etecalbertoferes.CaixaDeSugestoes.interfaces.rest;
+
+import jakarta.validation.constraints.*;
+import io.swagger.v3.oas.annotations.media.Schema;
+import br.com.etecalbertoferes.CaixaDeSugestoes.application.SuggestionCommand;
+
+public record SuggestionRequest(
+        @NotBlank(message = "Título é obrigatório") @Schema(description = "Título obrigatório; texto preservado", example = "Mais tomadas na biblioteca") String title,
+        @NotBlank(message = "Conteúdo é obrigatório") @Schema(description = "Conteúdo obrigatório; texto preservado", example = "Instalar tomadas nas mesas de estudo.") String content,
+        @Schema(description = "Nome opcional; espaços externos removidos. Ausente, nulo ou em branco torna a sugestão anônima", example = "Pessoa Exemplo") String author,
+        @NotNull(message = "Curso é obrigatório") @Positive(message = "Curso deve ser positivo") @Schema(description = "ID de curso existente", example = "1") Long courseId,
+        @NotNull(message = "Categoria é obrigatória") @Positive(message = "Categoria deve ser positiva") @Schema(description = "ID de categoria existente", example = "1") Long categoryId) {
+    public SuggestionCommand command() {
+        return new SuggestionCommand(title, content, author, courseId, categoryId);
     }
 }
 ```
 
 ### `src/main/resources/application.yaml`
 
-Crie ou substitua o arquivo completo.
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
 
 <!-- arquivo: src/main/resources/application.yaml -->
 ```yaml
@@ -500,162 +805,115 @@ springdoc:
   api-docs:
     path: /v3/api-docs
 app:
-  admin:
-    username: ${ADMIN_USERNAME}
-    password-hash: ${ADMIN_PASSWORD_HASH}
   jwt:
-    secret-base64: ${JWT_SECRET_BASE64}
+    secret-base64: ${JWT_SECRET_BASE64:}
+    key-file: ${JWT_KEY_FILE:.local/jwt-signing.key}
     ttl-seconds: ${JWT_TTL_SECONDS:900}
 ```
 
-```powershell
-.\gradlew.bat bootJar
-java -jar build/libs/CaixaDeSugestoes-0.0.1-SNAPSHOT.jar --generate-jwt-secret
-```
+### `src/test/java/br/com/etecalbertoferes/CaixaDeSugestoes/ApiIntegrationTest.java`
 
-Copie a chave gerada para o ambiente local que inicia a API:
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
 
-```powershell
-$env:ADMIN_USERNAME = 'administrador'
-$env:ADMIN_PASSWORD_HASH = 'COLE_O_HASH_BCRYPT_GERADO_EM_08'
-$env:JWT_SECRET_BASE64 = 'COLE_A_CHAVE_ALEATORIA_GERADA'
-$env:JWT_TTL_SECONDS = '900'
-docker compose up -d --wait
-.\gradlew.bat bootRun
-```
-
-No Linux/macOS, use `export` para as variáveis e `./gradlew`. Não use os
-placeholders literais acima: a aplicação exige valores válidos. Fora de localhost,
-use HTTPS. `.env` é ignorado pelo Git e não é carregado automaticamente pelo Java.
-O arquivo `.env.example` lista os nomes, sem credenciais reais.
-
-## 6. Atualize Swagger
-
-O botão **Authorize** agora recebe somente o JWT (sem escrever `Bearer` no campo;
-a interface acrescenta o esquema). Ele se aplica ao PUT/DELETE, enquanto login e
-operações públicas não recebem requisito de segurança global.
-
-### `src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/interfaces/rest/OpenApiConfiguration.java`
-
-Crie ou substitua o arquivo completo.
-
-<!-- arquivo: src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/interfaces/rest/OpenApiConfiguration.java -->
+<!-- arquivo: src/test/java/br/com/etecalbertoferes/CaixaDeSugestoes/ApiIntegrationTest.java -->
 ```java
-package br.com.etecalbertoferes.CaixaDeSugestoes.interfaces.rest;
+package br.com.etecalbertoferes.CaixaDeSugestoes;
 
-import io.swagger.v3.oas.models.OpenAPI;
-import io.swagger.v3.oas.models.info.Info;
-import org.springframework.context.annotation.*;
-@Configuration
-public class OpenApiConfiguration {
-    @Bean OpenAPI api() {
-        return new OpenAPI().components(new io.swagger.v3.oas.models.Components().addSecuritySchemes("bearerAuth",
-            new io.swagger.v3.oas.models.security.SecurityScheme().type(io.swagger.v3.oas.models.security.SecurityScheme.Type.HTTP).scheme("bearer").bearerFormat("JWT"))).info(new Info().title("Caixa de Sugestões — Etec Prefeito Alberto Feres")
-            .version("2.0.0").description("API de sugestões para consumo pelo projeto web com Thymeleaf. Catálogos didáticos somente para consulta. Datas em UTC."));
+import java.time.Instant;
+import br.com.etecalbertoferes.CaixaDeSugestoes.application.*;
+import br.com.etecalbertoferes.CaixaDeSugestoes.domain.*;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
+import static org.assertj.core.api.Assertions.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+@AutoConfigureMockMvc
+@Transactional
+class ApiIntegrationTest extends ContextTest {
+    @Autowired MockMvc mvc;
+    @Autowired jakarta.persistence.EntityManager em;
+    @Autowired SuggestionService service;
+    @Autowired SuggestionRepository repository;
+    @Autowired CatalogService catalogs;
+    Long course() { return catalogs.courses().get(0).id(); }
+    Long category() { return catalogs.categories().get(0).id(); }
+    Suggestion create(String title, String content, String author, Long courseId, Long categoryId) {
+        return service.create(new SuggestionCommand(title, content, author, courseId, categoryId));
+    }
+    @Test void catalogAndHttpLifecycle() throws Exception {
+        mvc.perform(get("/api/courses")).andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(4));
+        mvc.perform(get("/api/categories")).andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(3));
+        String body = "{\"title\":\"Tomadas\",\"content\":\"Biblioteca\",\"author\":\"  Pessoa  \",\"courseId\":"+course()+",\"categoryId\":"+category()+"}";
+        String location = mvc.perform(post("/api/suggestions").contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isCreated()).andExpect(jsonPath("$.author").value("Pessoa"))
+            .andReturn().getResponse().getHeader("Location");
+        Long id = Long.valueOf(location.substring(location.lastIndexOf('/')+1));
+        Instant time = service.get(id).createdAt();
+        mvc.perform(get(location)).andExpect(status().isOk()).andExpect(jsonPath("$.title").value("Tomadas"));
+        mvc.perform(put(location).with(user("test-admin").roles("ADMIN")).contentType(MediaType.APPLICATION_JSON).content(body.replace("  Pessoa  ", "  ")))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.author").value("Anônimo"));
+        assertThat(service.get(id).createdAt()).isEqualTo(time);
+        em.flush();
+        assertThat(jdbc.queryForObject("select author from suggestions where id=?", String.class, id)).isNull();
+        mvc.perform(delete(location).with(user("test-admin").roles("ADMIN"))).andExpect(status().isNoContent()).andExpect(content().string(""));
+        mvc.perform(get(location)).andExpect(status().isNotFound());
+        mvc.perform(delete(location).with(user("test-admin").roles("ADMIN"))).andExpect(status().isNotFound());
+        mvc.perform(put(location).with(user("test-admin").roles("ADMIN")).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isNotFound());
+        assertThat(catalogs.courses()).hasSize(4);
+        assertThat(catalogs.categories()).hasSize(3);
+    }
+    @Test void filtersLiteralCharactersAndOrdering() {
+        Long c1 = course(), c2 = catalogs.courses().get(1).id();
+        Long t1 = category(), t2 = catalogs.categories().get(1).id();
+        Suggestion a = create("Tomadas 100%_!", "biblioteca", null, c1, t1);
+        Suggestion b = create("outro", "TOMADAS 100xyz", "", c2, t1);
+        Suggestion c = create("Tomadas", "terceiro", "Pessoa", c1, t2);
+        assertThat(service.list(null,null,"tomadas")).extracting(Suggestion::id).containsExactly(c.id(), b.id(), a.id());
+        assertThat(service.list(c1,null,null)).extracting(Suggestion::id).containsExactly(c.id(), a.id());
+        assertThat(service.list(null,t1,null)).extracting(Suggestion::id).containsExactly(b.id(), a.id());
+        assertThat(service.list(c1,t1," TOMADAS ")).extracting(Suggestion::id).containsExactly(a.id());
+        for (String literal : new String[]{"%", "_", "!", "100%_!"})
+            assertThat(service.list(null,null,literal)).extracting(Suggestion::id).containsExactly(a.id());
+        assertThat(service.list(999999L,null,null)).isEmpty();
+        assertThat(service.list(null,999999L,null)).isEmpty();
+        assertThat(service.list(null,null,"inexistente")).isEmpty();
+        assertThat(service.list(null,null,"  ")).hasSize(3);
+        Instant same = Instant.parse("2026-01-01T00:00:00Z");
+        jdbc.update("update suggestions set created_at=?", java.sql.Timestamp.from(same));
+        assertThat(service.list(null,null,null)).extracting(Suggestion::id).containsExactly(c.id(), b.id(), a.id());
+    }
+    @Test void rejectedUpdatesPreserveStoredDataAndTextHasNo255Limit() throws Exception {
+        Suggestion item = create("x".repeat(500), "y".repeat(1000), null, course(), category());
+        String invalid = "{\"title\":\"change\",\"content\":\"change\",\"courseId\":"+course()+",\"categoryId\":999999}";
+        mvc.perform(put("/api/suggestions/"+item.id()).with(user("test-admin").roles("ADMIN")).contentType(MediaType.APPLICATION_JSON).content(invalid)).andExpect(status().isNotFound());
+        assertThat(service.get(item.id()).title()).hasSize(500);
+        assertThat(service.get(item.id()).content()).hasSize(1000);
+        mvc.perform(post("/api/suggestions").contentType(MediaType.APPLICATION_JSON).content(invalid)).andExpect(status().isNotFound());
+        assertThat(service.list(null,null,null)).hasSize(1);
+    }
+    @Test void openApiDocumentsAllOperations() throws Exception {
+        mvc.perform(get("/v3/api-docs")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.paths['/api/suggestions'].get").exists())
+            .andExpect(jsonPath("$.paths['/api/suggestions'].post.responses['201']").exists())
+            .andExpect(jsonPath("$.paths['/api/suggestions/{id}'].get").exists())
+            .andExpect(jsonPath("$.paths['/api/suggestions/{id}'].put").exists())
+            .andExpect(jsonPath("$.paths['/api/suggestions/{id}'].delete.responses['204']").exists())
+            .andExpect(jsonPath("$.paths['/api/courses'].get").exists())
+            .andExpect(jsonPath("$.paths['/api/categories'].get").exists());
+        mvc.perform(get("/swagger-ui.html")).andExpect(status().is3xxRedirection());
     }
 }
-```
-
-### `src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/interfaces/rest/SuggestionController.java`
-
-Crie ou substitua o arquivo completo.
-
-<!-- arquivo: src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/interfaces/rest/SuggestionController.java -->
-```java
-package br.com.etecalbertoferes.CaixaDeSugestoes.interfaces.rest;
-
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import io.swagger.v3.oas.annotations.responses.*;
-import io.swagger.v3.oas.annotations.media.*;
-import java.net.URI;
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.Positive;
-import java.util.List;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import br.com.etecalbertoferes.CaixaDeSugestoes.application.SuggestionService;
-
-@Tag(name = "Sugestões", description = "Cadastro, consulta, substituição e exclusão de sugestões")
-@RestController
-@RequestMapping("/api/suggestions")
-@ApiResponses({
-    @ApiResponse(responseCode = "400", description = "Dados, ID ou filtro inválido", content = @Content(schema = @Schema(implementation = ApiError.class))),
-    @ApiResponse(responseCode = "404", description = "Sugestão, curso ou categoria não encontrado", content = @Content(schema = @Schema(implementation = ApiError.class))),
-    @ApiResponse(responseCode = "500", description = "Erro interno", content = @Content(schema = @Schema(implementation = ApiError.class)))
-})
-public class SuggestionController {
-    private final SuggestionService service;
-    public SuggestionController(SuggestionService service) { this.service = service; }
-    @Operation(summary = "Listar sugestões", description = "Array sem paginação. Filtros combinados por AND; q busca título OU conteúdo sem distinguir maiúsculas. Espaços externos são removidos; vazio é ignorado. %, _ e ! são literais. Ordem: createdAt e id decrescentes. IDs positivos inexistentes retornam [].")
-    @ApiResponse(responseCode = "200", description = "Lista de sugestões, inclusive vazia")
-    @GetMapping
-    public List<SuggestionResponse> list(@Parameter(description = "ID positivo do curso") @RequestParam(required = false) @Positive(message = "ID deve ser positivo") Long courseId,
-            @Parameter(description = "ID positivo da categoria") @RequestParam(required = false) @Positive(message = "ID deve ser positivo") Long categoryId, @Parameter(description = "Trecho literal do título ou conteúdo") @RequestParam(required = false) String q) {
-        return service.list(courseId, categoryId, q).stream().map(SuggestionResponse::from).toList();
-    }
-    @Operation(summary = "Consultar sugestão por ID")
-    @ApiResponse(responseCode = "200", description = "Sugestão encontrada")
-    @GetMapping("/{id}")
-    public SuggestionResponse get(@PathVariable @Positive(message = "ID deve ser positivo") Long id) { return SuggestionResponse.from(service.get(id)); }
-    @Operation(summary = "Criar sugestão", description = "O servidor gera id e createdAt. Autor ausente, nulo ou em branco é armazenado como null e devolvido como Anônimo. Consulte os IDs dos catálogos antes de enviar.")
-    @ApiResponse(responseCode = "201", description = "Sugestão criada; Location contém /api/suggestions/{id}", content = @Content(schema = @Schema(implementation = SuggestionResponse.class)), headers = @io.swagger.v3.oas.annotations.headers.Header(name = "Location", schema = @Schema(type = "string")))
-    @PostMapping
-    public ResponseEntity<SuggestionResponse> create(@Valid @RequestBody SuggestionRequest request) {
-        SuggestionResponse response = SuggestionResponse.from(service.create(request.command()));
-        return ResponseEntity.created(URI.create("/api/suggestions/" + response.id())).body(response);
-    }
-    @Operation(summary = "Substituir campos editáveis", description = "Preserva id e createdAt. Omitir author remove o nome anterior. Curso e categoria são obrigatórios. Falhas não alteram o registro.")
-    @ApiResponse(responseCode = "200", description = "Sugestão atualizada")
-    @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "bearerAuth")
-    @ApiResponse(responseCode = "401", description = "Autenticação necessária", content = @Content(schema = @Schema(implementation = ApiError.class)))
-    @ApiResponse(responseCode = "403", description = "Acesso negado", content = @Content(schema = @Schema(implementation = ApiError.class)))
-    @PutMapping("/{id}")
-    public SuggestionResponse update(@PathVariable @Positive(message = "ID deve ser positivo") Long id, @Valid @RequestBody SuggestionRequest request) {
-        return SuggestionResponse.from(service.update(id, request.command()));
-    }
-    @Operation(summary = "Excluir sugestão", description = "Exclusão física, preservando curso e categoria. Repetir a exclusão retorna 404.")
-    @ApiResponse(responseCode = "204", description = "Excluída, sem corpo", content = @Content)
-    @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "bearerAuth")
-    @ApiResponse(responseCode = "401", description = "Autenticação necessária", content = @Content(schema = @Schema(implementation = ApiError.class)))
-    @ApiResponse(responseCode = "403", description = "Acesso negado", content = @Content(schema = @Schema(implementation = ApiError.class)))
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable @Positive(message = "ID deve ser positivo") Long id) { service.delete(id); return ResponseEntity.noContent().build(); }
-}
-```
-
-Execute `/api/auth/login` primeiro, copie `accessToken` e autorize. Expirou? Faça
-login novamente. Não cole tokens reais em exemplos de documentação.
-
-## 7. Substitua o teste Basic pelos testes JWT
-
-**Exclua** `src/test/java/br/com/etecalbertoferes/CaixaDeSugestoes/BasicSecurityIntegrationTest.java`.
-Não o mantenha: Basic deve parar de autenticar depois desta etapa.
-Preserve os testes anteriores de negócio e de contexto. A chave abaixo existe
-somente no perfil `test`; nunca a copie para o ambiente da aplicação.
-
-### `src/test/resources/application-test.yaml`
-
-Crie ou substitua o arquivo completo.
-
-<!-- arquivo: src/test/resources/application-test.yaml -->
-```yaml
-app:
-  admin:
-    username: test-admin
-  jwt:
-    secret-base64: dGVzdC1vbmx5LXNlY3JldC1ub3QtZm9yLXByb2R1Y3Rpb24h
-    ttl-seconds: 900
-spring:
-  datasource:
-    hikari:
-      connection-timeout: 3000
 ```
 
 ### `src/test/java/br/com/etecalbertoferes/CaixaDeSugestoes/JwtSecurityIntegrationTest.java`
 
-Crie ou substitua o arquivo completo.
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
 
 <!-- arquivo: src/test/java/br/com/etecalbertoferes/CaixaDeSugestoes/JwtSecurityIntegrationTest.java -->
 ```java
@@ -782,6 +1040,17 @@ class JwtSecurityIntegrationTest extends ContextTest {
         mvc.perform(delete("/api/suggestions/999999").header("Authorization", "Bearer "+jwt))
             .andExpect(status().isForbidden()).andExpect(jsonPath("$.status").value(403));
     }
+    @Test void disablingAdminRejectsBothLoginAndPreviouslyIssuedJwt() throws Exception {
+        String jwt = token();
+        jdbc.update("update administrators set active=false where username=?", "test-admin");
+        try {
+            mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(java.util.Map.of("username", "test-admin", "password", ADMIN_PASSWORD))))
+                .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.message").value("Credenciais inválidas"));
+            mvc.perform(delete("/api/suggestions/999999").header("Authorization", "Bearer " + jwt))
+                .andExpect(status().isUnauthorized());
+        } finally { jdbc.update("update administrators set active=true where username=?", "test-admin"); }
+    }
     @Test void swaggerMarksOnlyMutationsWithBearerSecurity() throws Exception {
         mvc.perform(get("/v3/api-docs")).andExpect(status().isOk())
             .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.scheme").value("bearer"))
@@ -795,113 +1064,186 @@ class JwtSecurityIntegrationTest extends ContextTest {
 
 ### `src/test/java/br/com/etecalbertoferes/CaixaDeSugestoes/infrastructure/security/SecurityConfigurationTest.java`
 
-Crie ou substitua o arquivo completo.
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
 
 <!-- arquivo: src/test/java/br/com/etecalbertoferes/CaixaDeSugestoes/infrastructure/security/SecurityConfigurationTest.java -->
 ```java
 package br.com.etecalbertoferes.CaixaDeSugestoes.infrastructure.security;
 
+import java.nio.file.*;
+import java.util.Base64;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.mock.env.MockEnvironment;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import br.com.etecalbertoferes.CaixaDeSugestoes.domain.*;
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 class SecurityConfigurationTest {
-    @Test void missingInvalidAndWeakSigningKeysFailClosed() {
-        JwtConfiguration config = new JwtConfiguration();
-        assertThatThrownBy(() -> config.jwtSigningKey(new MockEnvironment())).isInstanceOf(IllegalStateException.class);
-        for (String secret : new String[]{"not base64!", "", "c2hvcnQ="})
+    @TempDir Path temp;
+    @Test void missingSecretCreatesAndReusesPrivateKeyFile() throws Exception {
+        Path file = temp.resolve("private/jwt.key");
+        var env = new MockEnvironment().withProperty("app.jwt.key-file", file.toString());
+        var config = new JwtConfiguration();
+        byte[] first = config.jwtSigningKey(env).getEncoded();
+        assertThat(first).hasSize(32);
+        assertThat(config.jwtSigningKey(env).getEncoded()).isEqualTo(first);
+        assertThat(Base64.getDecoder().decode(Files.readString(file))).isEqualTo(first);
+        if (file.getFileSystem().supportedFileAttributeViews().contains("posix"))
+            assertThat(Files.getPosixFilePermissions(file)).isEqualTo(java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
+    }
+    @Test void invalidOrWeakExplicitKeysFailClosed() {
+        var config = new JwtConfiguration();
+        for (String secret : new String[]{"not base64!", "c2hvcnQ="})
             assertThatThrownBy(() -> config.jwtSigningKey(new MockEnvironment().withProperty("app.jwt.secret-base64", secret)))
                 .isInstanceOf(IllegalStateException.class);
     }
-    @Test void missingOrPlaintextAdminPasswordIsRejected() {
-        AdminConfiguration config = new AdminConfiguration();
-        assertThatThrownBy(() -> config.adminUsers(new MockEnvironment())).isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(() -> config.adminUsers(new MockEnvironment().withProperty("app.admin.username", "admin")
-            .withProperty("app.admin.password-hash", "plaintext"))).isInstanceOf(IllegalStateException.class);
+    @Test void invalidExistingKeyIsNotOverwritten() throws Exception {
+        Path file = temp.resolve("jwt.key"); Files.writeString(file, "broken key");
+        assertThatThrownBy(() -> new JwtConfiguration().jwtSigningKey(new MockEnvironment().withProperty("app.jwt.key-file", file.toString())))
+            .isInstanceOf(IllegalStateException.class);
+        assertThat(Files.readString(file)).isEqualTo("broken key");
+    }
+    @Test void explicitKeyDoesNotCreateLocalFile() {
+        Path file = temp.resolve("jwt.key");
+        var env = new MockEnvironment().withProperty("app.jwt.key-file", file.toString())
+            .withProperty("app.jwt.secret-base64", Base64.getEncoder().encodeToString(new byte[32]));
+        assertThat(new JwtConfiguration().jwtSigningKey(env).getEncoded()).hasSize(32);
+        assertThat(file).doesNotExist();
+    }
+    @Test void userDetailsComeFromDatabaseAndHonorActiveFlag() {
+        AdminAccountRepository accounts = mock(AdminAccountRepository.class);
+        when(accounts.findByUsername("missing")).thenReturn(java.util.Optional.empty());
+        when(accounts.findByUsername("disabled")).thenReturn(java.util.Optional.of(new AdminAccount(1L,"disabled","hash",false)));
+        var users = new AdminConfiguration().adminUsers(accounts);
+        assertThatThrownBy(() -> users.loadUserByUsername("missing")).isInstanceOf(UsernameNotFoundException.class);
+        assertThat(users.loadUserByUsername("disabled").isEnabled()).isFalse();
     }
 }
 ```
 
-Com Docker disponível:
+### `src/test/resources/application-test.yaml`
 
-```powershell
-.\gradlew.bat test bootJar
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
+
+<!-- arquivo: src/test/resources/application-test.yaml -->
+```yaml
+app:
+  jwt:
+    secret-base64: dGVzdC1vbmx5LXNlY3JldC1ub3QtZm9yLXByb2R1Y3Rpb24h
+    ttl-seconds: 900
+spring:
+  datasource:
+    hikari:
+      connection-timeout: 3000
 ```
 
-A suíte final tem **32 testes**, sem ignorar integração. Ela verifica login real,
-JWT real em PUT/DELETE, chamadas públicas, 401, 403, expiração, assinatura
-adulterada, issuer/audience/subject incorretos, ausência de exp, ausência de sessão,
-rejeição de Basic e configuração insegura. O teste sem ADMIN usa um token assinado
-de propósito no ambiente de teste; a API não oferece uma rota para emiti-lo.
+Acrescente ao `.gitignore` do seu projeto:
 
-## 8. Execute as collections atualizadas
+```gitignore
+.local/
+config/application.properties
+```
 
-Importe os arquivos de `collections/` da branch `09-jwt-bearer-token-impl`.
-São **29 requisições por cliente**. Preencha `adminUsername` e `adminPassword`
-somente localmente. O pré-script serializa o JSON de login corretamente mesmo
-quando a senha contém aspas ou barras; não monte JSON concatenando credenciais.
+## 3. Execute e autentique
 
-| Ordem | Verificação |
-| --- | --- |
-| 01–02 | Catálogos públicos e captura dos IDs |
-| 03 | Login válido e captura automática de accessToken |
-| 04–05 | Senha incorreta e login vazio |
-| 06 | Criação pública, sem token |
-| 07–09 | PUT/DELETE sem token e token inválido |
-| 10–15 | Consultas e filtros públicos |
-| 16 | PUT com Bearer e preservação de createdAt |
-| 17–24 | Erros de negócio e protocolo |
-| 25–28 | DELETE com Bearer e confirmação da exclusão |
-| 29 | OpenAPI |
+Se o administrador ainda não foi cadastrado, use o setup do módulo 08. Depois,
+a execução normal não precisa de username/hash em variáveis de ambiente:
 
-Os IDs e o token são capturados pelos scripts. `accessToken` é enviado somente
-nas operações protegidas. As falhas previstas são testes bem-sucedidos quando
-retornam seus códigos. Não compartilhe exports depois de preencher credenciais
-ou executar login sem antes remover senha, loginBody, token e respostas salvas.
+```bash
+docker compose up -d --wait
+./gradlew bootRun
+```
 
-O verificador opcional `node scripts/verify-collections.mjs` aceita a URL como
-argumento e lê `ADMIN_USERNAME` e `ADMIN_PASSWORD` do ambiente do próprio cliente.
-`ADMIN_PASSWORD` não configura o servidor: a API recebe somente o hash.
-A senha em texto puro é necessária apenas no cliente que autentica.
+A porta padrão do material é 8000. Use SERVER_PORT para mudá-la e ajuste baseUrl.
+Para um banco novo, o fluxo completo é:
 
-## 9. Entenda a expiração e o reinício
+```bash
+./gradlew bootJar
+java -jar build/libs/CaixaDeSugestoes-0.0.1-SNAPSHOT.jar --setup-admin
+./gradlew bootRun
+```
+
+No Windows, use `.\gradlew.bat`. Execute o JAR de setup em terminal interativo.
+A partir da segunda execução, banco e arquivo de chave preservam o estado.
+O diretório de trabalho deve ser o mesmo; para outros diretórios, fixe JWT_KEY_FILE.
+As variáveis antigas ADMIN_USERNAME/ADMIN_PASSWORD_HASH não configuram mais a API.
+
+No login, envie JSON com username e password escolhidos no setup. A resposta tem
+accessToken, tokenType=`Bearer` e expiresIn em segundos, com Cache-Control no-store.
+Usuário inexistente, senha incorreta e conta inativa retornam 401 genérico.
+No Authorize do Swagger, cole somente o JWT. Basic não autentica nesta versão.
+
+## 4. Autorização e expiração
 
 ```mermaid
-sequenceDiagram
-    actor Admin
-    participant API
-    participant JWT as Validação do JWT
-    Admin->>API: Login com credenciais
-    API-->>Admin: Token válido por expiresIn segundos
-    Admin->>API: PUT com Bearer
-    API->>JWT: Verificar assinatura e expiração
-    JWT-->>API: Token válido e ADMIN
-    API-->>Admin: 200
-    Note over API: Reinício com a mesma chave e o mesmo administrador
-    Admin->>API: DELETE com o mesmo token ainda válido
-    API-->>Admin: 204
-    Note over Admin,JWT: Depois de expirar
-    Admin->>API: Nova operação com token expirado
-    API-->>Admin: 401, fazer login novamente
+flowchart TD
+    Request["PUT ou DELETE"] --> Token{"Bearer com assinatura,<br/>algoritmo e claims válidos?"}
+    Token -->|"Não"| Unauthorized["401 e WWW-Authenticate: Bearer"]
+    Token -->|"Sim"| Conta{"Subject identifica conta ativa?"}
+    Conta -->|"Não"| Unauthorized
+    Conta -->|"Sim"| Papel{"Papel ADMIN?"}
+    Papel -->|"Não"| Forbidden["403 e ApiError"]
+    Papel -->|"Sim"| Negocio["Controller e regras de negócio"]
 ```
 
-Reiniciar com a mesma chave não revoga o token. Trocar a chave invalida todos os
-tokens anteriores. Alterar a senha não revoga tokens já emitidos; eles expiram
-normalmente. Apagar o token do cliente encerra seu uso local, sem revogação
-individual no servidor. Preserve a chave de forma segura e mantenha o relógio
-correto. Refresh, revogação e limitação de tentativas podem ser evoluções futuras.
+O 403 é testado com token assinado de outro papel somente no ambiente de teste;
+a API emite apenas ADMIN. Uma chamada pública deve omitir o header: se enviar
+Bearer inválido, o filtro rejeita a credencial antes do controller.
+A API não cria sessão e não autentica por cookies. CSRF está desabilitado por
+usar Bearer explícito; não copie isso para sessão de navegador do projeto web.
 
-## Confira antes de avançar
+Reiniciar com a mesma chave preserva tokens não expirados. Trocar/apagar a chave
+invalida todos os tokens anteriores. Desativar a conta bloqueia login e uso do JWT
+enquanto estiver inativa; reativá-la não constitui uma revogação permanente dos
+tokens antigos. Alterar apenas o hash da senha não revoga tokens já emitidos.
+Logout local significa remover a credencial do cliente. Use HTTPS fora de localhost.
 
-- Login emite token somente para o administrador provisionado.
-- Consultas e envio anônimo não dependem de autenticação.
-- PUT/DELETE exigem JWT válido e ADMIN; Basic não autentica mais.
-- Claims e expiração são verificadas, e as respostas 401/403 seguem ApiError.
-- Collections e Swagger permitem reproduzir o fluxo sem valores reais versionados.
-- A suíte completa passa com PostgreSQL real.
+## 5. Collections e testes
 
-Faça um commit desta etapa no seu projeto. Explique a diferença entre autenticar,
-autorizar, assinar e criptografar antes do [planejamento web](10-continuacao-web.md).
+Importe as collections da branch final. São **29 requisições por cliente**.
+Preencha adminUsername/adminPassword com a conta cadastrada, somente no cliente
+local. O pré-script serializa o JSON, inclusive para senhas com aspas e barras.
+O login captura accessToken; somente PUT/DELETE enviam Bearer automaticamente.
+
+| Ordem | Conferência |
+| --- | --- |
+| 01–02 | Catálogos públicos |
+| 03 | Login com a conta do banco e captura do token |
+| 04–05 | Login incorreto e vazio |
+| 06 | Criação pública |
+| 07–09 | Ausência de token e token inválido |
+| 10–15 | Consultas e filtros |
+| 16 | PUT com Bearer |
+| 17–24 | Erros de negócio e protocolo |
+| 25–28 | DELETE e confirmação de ausência |
+| 29 | OpenAPI |
+
+Não exporte senha, loginBody, token ou respostas reais. As collections versionadas
+não contêm esses valores. A importação visual deve ser conferida no aplicativo.
+
+```bash
+./gradlew build
+```
+
+Espere **39 testes** aprovados com PostgreSQL real. A suíte inclui cadastro inicial,
+BCrypt, recusa de sobrescrita, conta inativa, JWT real, claims, assinatura adulterada,
+expiração, 401/403, arquivo privado persistente e rejeição de chave inválida.
+
+O verificador opcional `node scripts/verify-collections.mjs URL` recebe
+ADMIN_USERNAME e ADMIN_PASSWORD no ambiente **do cliente**. Esses valores servem
+para fazer login no banco, não para cadastrar/configurar a conta do servidor.
+
+## Pronto quando
+
+- A API inicia sem credenciais administrativas exportadas.
+- A primeira conta é provisionada interativamente no PostgreSQL.
+- O arquivo privado de chave é preservado e ignorado pelo Git.
+- Login e operações protegidas funcionam; desativar a conta bloqueia acesso.
+- Os 39 testes e o fluxo das collections passam.
+
+Faça um commit. Continue em [10 — Planejamento web](10-continuacao-web.md).
 
 Referências: [Resource Server JWT](https://docs.spring.io/spring-security/reference/servlet/oauth2/resource-server/jwt.html)
-e [autenticação por senha](https://docs.spring.io/spring-security/reference/servlet/authentication/passwords/index.html).
+e [aplicações sem servidor web](https://docs.spring.io/spring-boot/how-to/application.html).
