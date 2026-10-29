@@ -646,6 +646,7 @@ app:
     username: test-admin
   jwt:
     secret-base64: dGVzdC1vbmx5LXNlY3JldC1ub3QtZm9yLXByb2R1Y3Rpb24h
+    ttl-seconds: 900
 spring:
   datasource:
     hikari:
