@@ -24,7 +24,7 @@ Uma pessoa percebe que faltam tomadas na biblioteca. Ela escolhe um curso e a ca
 | Como consultar novamente? | id gerado pelo banco |
 
 O nome informado é apenas um texto, não uma identidade autenticada. O contrato base das etapas 01–07 não tem login. Em 08–09, um administrador
-provisionado por ambiente passa a editar/excluir sugestões; o público continua
+provisionado no banco passa a editar/excluir sugestões; o público continua
 consultando e enviando sem autenticação.
 Não há cadastro público de usuários, curtidas, controle de propriedade ou triagem.
 
@@ -290,8 +290,8 @@ sequenceDiagram
 ## Evolução do acesso nos módulos 08–09
 
 O modelo de sugestões e os catálogos não mudam. A conta administrativa é
-provisionada pelo ambiente com hash BCrypt, sem tabela de usuários ou seed de
-senha. O novo contrato adiciona `POST /api/auth/login` e restringe PUT/DELETE.
+provisionada por comando interativo na tabela administrators, com hash BCrypt e
+sem seed de senha. O novo contrato adiciona `POST /api/auth/login` e restringe PUT/DELETE.
 
 ```mermaid
 flowchart LR
@@ -307,3 +307,20 @@ e 401 para credenciais inválidas. Nas operações protegidas, ausência ou falh
 autenticação resulta em 401; token válido sem ADMIN, 403. Só depois da autorização
 ocorrem os resultados de negócio descritos acima, como 400, 404, 200 ou 204.
 Consulte [08](08-spring-security.md) e [09](09-jwt-bearer-token.md) para implementar.
+
+### Conta administrativa separada das sugestões
+
+```mermaid
+erDiagram
+    ADMINISTRATORS {
+        bigint id PK
+        varchar username UK "Ate 100 caracteres"
+        varchar password_hash "BCrypt, nunca senha pura"
+        boolean active "Controla acesso"
+        timestamptz created_at "Criado no banco"
+    }
+```
+
+A ausência de uma ligação nesse diagrama é intencional: author é texto de quem
+enviou a sugestão e não referencia administrators. V3 prepara a tabela; o setup
+cadastra a conta depois. Desativar a conta impede login e validação de seus JWT.

@@ -17,6 +17,10 @@ arquivos completos para reprodução; o código executável fica nos checkpoints
 A etapa `07-testes-entrega-impl` preserva a versão completa sem autenticação.
 Em cada checkpoint executável, leia `SOLUCAO.md` para iniciar a versão correspondente.
 
+Para executar a versão final, cadastre o administrador uma vez com `--setup-admin`,
+conforme `SOLUCAO.md` na branch de implementação. A conta fica no PostgreSQL e a
+chave JWT é gerada automaticamente em um arquivo privado fora do Git.
+
 ## Roteiro incremental
 
 ```mermaid
@@ -42,7 +46,7 @@ flowchart LR
 | [05 — Validação e erros](docs/05-validacao-erros.md) | Entradas validadas e erros uniformes | [05-validacao-erros](../../tree/05-validacao-erros) | [05-validacao-erros-impl](../../tree/05-validacao-erros-impl) |
 | [06 — OpenAPI e Swagger](docs/06-openapi-swagger.md) | Contrato navegável e executável | [06-openapi-swagger](../../tree/06-openapi-swagger) | [06-openapi-swagger-impl](../../tree/06-openapi-swagger-impl) |
 | [07 — Testes e entrega](docs/07-testes-entrega.md) | API completa, JAR e collections | [07-testes-entrega](../../tree/07-testes-entrega) | [07-testes-entrega-impl](../../tree/07-testes-entrega-impl) |
-| [08 — Spring Security](docs/08-spring-security.md) | Administrador BCrypt e permissões; Basic intermediário | [08-spring-security](../../tree/08-spring-security) | [08-spring-security-impl](../../tree/08-spring-security-impl) |
+| [08 — Spring Security](docs/08-spring-security.md) | Administrador no banco, setup interativo e Basic intermediário | [08-spring-security](../../tree/08-spring-security) | [08-spring-security-impl](../../tree/08-spring-security-impl) |
 | [09 — JWT e Bearer Token](docs/09-jwt-bearer-token.md) | Login administrativo e API final protegida | [09-jwt-bearer-token](../../tree/09-jwt-bearer-token) | [09-jwt-bearer-token-impl](../../tree/09-jwt-bearer-token-impl) |
 
 As branches de estudo do professor são documentais. As `-impl` contêm código
