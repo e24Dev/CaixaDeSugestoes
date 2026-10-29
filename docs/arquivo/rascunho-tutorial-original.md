@@ -1,6 +1,6 @@
 > Arquivo histórico com identificação institucional atualizada. A versão literal anterior está no commit 3785cc2. Este rascunho não orienta a trilha atual.
 
-# Missão: dar voz à escola 
+# Missão: dar voz à escola 🗣️
 
 **Laboratório de desenvolvimento web — Etec Prefeito Alberto Feres**
 
