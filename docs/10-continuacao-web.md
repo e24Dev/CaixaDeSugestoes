@@ -1,4 +1,4 @@
-# Continuação — projeto web Java com Thymeleaf
+# 10 — Continuação web Java com Thymeleaf
 
 [Roteiro](../README.md) · [Contrato da API](00-modelo-dados.md)
 
@@ -13,8 +13,8 @@ excluir sugestões.
 
 ## Pré-requisitos
 
-API concluída em 07, testes aprovados, coleção Insomnia validada pelo professor
-e domínio do contrato HTTP. Consulte a solução final em `07-testes-entrega-impl`.
+API protegida concluída em 09, testes aprovados, coleção Insomnia validada pelo professor
+e domínio do contrato HTTP. Consulte a solução final em `09-jwt-bearer-token-impl`.
 Mantenha a API e o projeto web em pastas e portas diferentes.
 
 ## Como as aplicações vão conversar
@@ -48,7 +48,8 @@ chamadas entre os dois servidores.
 5. Implementar criação, edição e exclusão, respeitando 201/200/204.
 6. Exibir `fieldErrors` junto aos campos e mensagens de ausência ou falha de rede.
 7. Tratar autor opcional, datas e navegação após cada operação.
-8. Testar o fluxo entre navegador, projeto web e API.
+8. Criar a área administrativa: login no servidor web, armazenamento do token no servidor e envio de Bearer em edição/exclusão.
+9. Testar o fluxo entre navegador, projeto web e API, incluindo token expirado e novo login.
 
 ## Estados que a interface precisa representar
 
@@ -82,5 +83,6 @@ permitir uma ação de recuperação, sem anunciar sucesso.
 - As responsabilidades do cliente web e da API estão claras.
 - O professor aprovou o contrato e definiu o escopo da próxima entrega.
 
-Autenticação, usuários e triagem serão decisões futuras; não devem ser introduzidos
-como dependências escondidas da interface desta etapa.
+O público continua sem login. O servidor web deve manter o JWT administrativo
+fora do JavaScript e usar sessão com cookie protegido e CSRF no navegador.
+Novos usuários, triagem e revogação de tokens exigem planejamento adicional.

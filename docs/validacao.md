@@ -3,12 +3,12 @@
 [Roteiro](../README.md) · [Guia do professor](guia-professor.md)
 
 Validação realizada em **29 de outubro de 2026** na revisão
-`tutoriais-api-incremental`.
+`09-jwt-bearer-token-impl` (incluindo a atualização da conta no banco).
 
 ## O que foi reproduzido
 
 Um projeto novo foi montado em uma pasta temporária, aplicando em ordem os
-blocos marcados com `<!-- arquivo: caminho -->` nos capítulos 01–07. Cada bloco
+blocos marcados com `<!-- arquivo: caminho -->` nos capítulos 01–09. Cada bloco
 contém um arquivo completo, criado ou substituído conforme a instrução.
 Nenhum arquivo Java, SQL ou de configuração foi obtido da solução para completar
 uma lacuna entre os capítulos.
@@ -51,6 +51,21 @@ A compilação usa a toolchain Java 17 do projeto. O Gradle e os testes foram
 executados no ambiente local disponível, com PostgreSQL 17 real via Testcontainers
 a partir de 03. Não foi utilizado H2.
 
+## Extensão de segurança: reprodução dos módulos 08–09
+
+A mesma extração de blocos foi aplicada em um projeto temporário novo, começando
+pelos capítulos 01–07 e continuando pelos arquivos de 08 e 09. A exclusão do teste
+Basic, instruída em 09, também foi aplicada. O conteúdo cumulativo foi comparado
+com o checkpoint 08 e com a implementação final 09.
+
+- 08: `test bootJar` aprovado, **30 testes**, zero falhas/erros/ignorados.
+- 09: `test bootJar` aprovado, **39 testes**, zero falhas/erros/ignorados.
+- O perfil de teste tem configuração isolada; a aplicação consulta o administrador
+  no banco e cria sua chave local automaticamente, sem credencial padrão.
+- As collections foram atualizadas por versão: Basic no checkpoint 08 e JWT no 09.
+- A validação final executou **58 requests** e verificou dados e token após reinício.
+- A documentação da interface web foi movida para `10-continuacao-web.md`.
+
 ## Coerência documental conferida
 
 - Links locais de navegação, arquivos e branches de apoio.
@@ -66,10 +81,13 @@ a partir de 03. Não foi utilizado H2.
 
 ## Diagramas Mermaid
 
-A documentação contém **23 diagramas**. Nesta revisão foram adicionados nove e
-refinado o fluxo de classificação de erros. Todos foram analisados e renderizados
+A documentação contém **30 diagramas**. A revisão inicial acrescentou nove e refinou o fluxo de erros. A extensão de
+segurança acrescentou cinco: acesso público/administrativo, permissões, login,
+validação Bearer e ciclo de expiração/reinício. Todos foram analisados e renderizados
 com Mermaid 12.2.0 em Chrome headless, sem falhas de sintaxe. Os novos diagramas
-e o fluxo de erros também foram conferidos visualmente.
+e o fluxo de erros também foram conferidos visualmente. A atualização no banco
+acrescenta o provisionamento inicial e o DER administrativo, e refina a geração
+automática de chave e a validação de conta ativa.
 
 | Cenário acrescentado | Onde estudar |
 | --- | --- |
@@ -79,7 +97,7 @@ e o fluxo de erros também foram conferidos visualmente.
 | AND entre filtros e OR entre título e conteúdo | [Contrato](00-modelo-dados.md) |
 | Contrato OpenAPI e execução real pelo Swagger | [06](06-openapi-swagger.md) |
 | Banco temporário de teste e banco persistente da aplicação | [07](07-testes-entrega.md) |
-| Estados da interface após respostas da API | [Continuação web](08-continuacao-web.md) |
+| Estados da interface após respostas da API | [Continuação web](10-continuacao-web.md) |
 | JDK, SDK, JVM do Gradle e toolchain | [Ambiente Windows](ambiente-windows.md) |
 | Distribuição somente de Markdown para main e checkpoints | [Guia do professor](guia-professor.md) |
 
@@ -97,11 +115,12 @@ um computador Windows novo. A preparação Windows continua sujeita à conferên
 da turma. A renderização dos diagramas foi verificada separadamente, conforme acima.
 
 A interface de importação do Insomnia/Postman não foi automatizada nesta revisão.
-A validação anterior da API incluiu 46 requisições das duas collections contra o
-JAR e preservação de dados após reinício; seu registro está em
+A validação da API protegida incluiu 58 requisições das duas collections contra o
+JAR e preservação de dados e token após reinício; seu registro está em
 `VALIDACAO-API.md` na solução completa. Em aula, execute o fluxo do módulo 07 no
 cliente escolhido antes de avançar para Thymeleaf.
 
-A revisão está em uma branch separada. A documentação ainda não foi propagada
-para main ou para os demais checkpoints e nenhuma branch foi publicada nesta
-etapa. O guia do professor mostra a integração documental após revisão.
+A documentação é distribuída para main e branches de estudo por cópia somente
+de README.md e docs/. O código dos checkpoints 01–07 permanece preservado.
+Os checkpoints 08–09 incluem a atualização administrativa; a publicação deve ser
+conferida comparando as referências locais e remotas, sem force push.

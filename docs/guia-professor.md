@@ -7,19 +7,22 @@
 A `main` já contém somente documentação e arquivos auxiliares de Git. Não é
 necessário remover Java dela. A revisão dos tutoriais foi preparada na branch
 `tutoriais-api-incremental`, criada a partir da implementação final para
-permitir comparar os exemplos com o código. Essa branch de revisão também
-contém a aplicação; leve somente os Markdown para a `main` ao aprovar o material.
+permitir comparar os exemplos com o código. Essa branch de revisão conserva a aplicação da etapa 07. A solução atual está
+em `09-jwt-bearer-token-impl`; somente os Markdown são sincronizados com main
+e com as branches de estudo.
 
 | Referência | Função |
 | --- | --- |
 | `main` | Entrada documental e roteiro completo |
-| Branches 01–07 sem sufixo | Documentação dos exercícios |
-| Branches 01–07 com `-impl` | Código cumulativo de apoio até cada etapa |
-| `07-testes-entrega-impl` | Solução final, suíte completa e collections |
+| Branches 01–09 sem sufixo | Documentação dos exercícios |
+| Branches 01–09 com `-impl` | Código cumulativo de apoio até cada etapa |
+| `07-testes-entrega-impl` | API completa sem autenticação |
+| `08-spring-security-impl` | Administrador BCrypt e Basic intermediário |
+| `09-jwt-bearer-token-impl` | API final protegida e collections JWT |
 | `tutoriais-api-incremental` | Revisão dos capítulos, ainda separada da main |
 
-A etapa 07 já é a branch final completa; um nome extra como `api-completa` pode
-ser criado depois como referência de distribuição, se fizer sentido para a turma.
+A etapa 09 é a branch final protegida; a 07 preserva a entrega sem autenticação.
+As branches 08 e 09 sem sufixo contêm somente documentação.
 Mantenha uma referência principal para evitar duas soluções finais divergentes.
 A revisão documental não reescreve o histórico dos checkpoints.
 
@@ -50,6 +53,8 @@ indica até onde vai o código executável, e não uma barreira para ler o mater
 | 05 | Validação e erros uniformes | 9, sendo 8 HTTP isolados |
 | 06 | Swagger e OpenAPI | Os mesmos 9 |
 | 07 | Precisão de datas, suíte completa e entrega | 20, incluindo integração |
+| 08 | Conta no banco, setup inicial e Basic | 30 |
+| 09 | Login, chave automática, JWT e conta ativa | 39 |
 
 Os testes de serviço e integração CRUD entram em 07. Não prometa que existem
 nos checkpoints anteriores. Antes de 05, erros de aplicação ainda não têm
@@ -63,24 +68,25 @@ não deve ignorar silenciosamente a integração.
 ## Revisar os tutoriais antes da distribuição
 
 1. Use a preparação Windows e crie um projeto novo conforme 01.
-2. Aplique os arquivos dos capítulos 01–07, preservando o que não for substituído.
+2. Aplique os arquivos dos capítulos 01–09, preservando o que não for substituído.
 3. Confira os critérios por etapa e execute os comandos apresentados.
-4. Em 07, espere 20 testes e valide o JAR com as collections, inclusive reinício.
-5. Peça a uma dupla para repetir sem ajuda e registre as dúvidas de reprodução.
+4. Em 07, espere 20 testes; em 08, 30; em 09, 39. Valide as collections da respectiva versão.
+5. Em 09, provisione a conta no banco, preserve a chave automática e valide 401/403 e reinício com token não expirado.
+6. Peça a uma dupla para repetir sem ajuda e registre as dúvidas de reprodução.
 
 O registro em [validacao.md](validacao.md) diferencia comparação automática,
 execução real e conferências manuais que ainda cabem à turma.
 
 ## Levar somente os Markdown para main
 
-Esta é a etapa de distribuição **após revisar a branch de tutoriais**. Ela não
-foi executada automaticamente. Execute com árvore limpa; preserve alterações
+Este é o procedimento de distribuição documental usado nesta entrega.
+Para atualizações futuras, execute com árvore limpa; preserve alterações
 locais antes de trocar de branch. Não faça merge da branch de revisão inteira,
 pois ela deriva da API e acrescentaria a aplicação à main.
 
 ```bash
 git switch main
-git restore --source=tutoriais-api-incremental -- README.md docs
+git restore --source=09-jwt-bearer-token-impl -- README.md docs
 git add README.md docs
 git diff --cached --name-only
 git commit -m "docs: publica trilha reproduzivel da API"
@@ -98,10 +104,10 @@ anteriores.
 
 ```mermaid
 flowchart TB
-    Revisao["tutoriais-api-incremental<br/>Tutoriais revisados e API de referência"]
+    Revisao["09-jwt-bearer-token-impl<br/>API protegida e tutoriais atuais"]
     Revisao -->|"Copiar somente Markdown aprovado"| Main["main: entrada documental"]
-    Main -->|"Sincronizar Markdown"| Estudos["Branches de estudo 01 a 07"]
-    Main -->|"Sincronizar Markdown"| Impl["Branches -impl 01 a 07"]
+    Main -->|"Sincronizar Markdown"| Estudos["Branches de estudo 01 a 09"]
+    Main -->|"Sincronizar Markdown"| Impl["Branches -impl 01 a 09"]
     Estudos --> Documentos["Continuam sem aplicação executável"]
     Impl --> Incrementos["Cada uma preserva seu incremento de código"]
 ```
@@ -149,5 +155,19 @@ Os diagramas do modelo explicam relações, criação e identificação opcional
 seus estados são conceituais e não pedem uma coluna de triagem no banco.
 
 O projeto web será Java com Thymeleaf, em aplicação separada, consumindo HTTP.
-Valide a API no Insomnia antes de iniciar essa etapa. Segurança, autenticação e
-controle de propriedade demandam planejamento próprio além desta trilha.
+Valide a API no Insomnia antes de iniciar essa etapa. O login é exclusivo do
+administrador. O projeto web deve manter o JWT no servidor e proteger sua sessão
+de navegador com CSRF. Não há cadastro público nem controle de propriedade.
+
+## Provisionamento administrativo e publicação
+
+V3 cria administrators sem senha embutida. Peça ao professor que escolha a conta
+com `java -jar ... --setup-admin`; não distribua credenciais compartilhadas em
+migration. A chave JWT nasce automaticamente em `.local` e deve ser preservada.
+A conta fica no banco do Compose; os testes provisionam sua própria conta em
+PostgreSQL temporário. Não confunda variáveis do cliente das collections com
+configuração da conta no servidor.
+
+A distribuição integra somente README.md e docs/ na main e nas branches
+pedagógicas, preservando o código incremental de cada `-impl`. A publicação usa
+push normal de todas as branches locais, sem force push e sem arquivos privados.
