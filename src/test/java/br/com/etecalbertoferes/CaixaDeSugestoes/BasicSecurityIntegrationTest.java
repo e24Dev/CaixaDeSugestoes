@@ -32,6 +32,13 @@ class BasicSecurityIntegrationTest extends ContextTest {
         mvc.perform(delete("/api/suggestions/999999").with(httpBasic("test-admin", "wrong")))
             .andExpect(status().isUnauthorized());
     }
+    @Test void inactiveAdminCannotAuthenticate() throws Exception {
+        jdbc.update("update administrators set active=false where username=?", "test-admin");
+        try {
+            mvc.perform(delete("/api/suggestions/999999").with(httpBasic("test-admin", ADMIN_PASSWORD)))
+                .andExpect(status().isUnauthorized());
+        } finally { jdbc.update("update administrators set active=true where username=?", "test-admin"); }
+    }
     @Test void authenticatedNonAdminGetsForbidden() throws Exception {
         mvc.perform(delete("/api/suggestions/999999").with(user("reader").roles("READER")))
             .andExpect(status().isForbidden()).andExpect(jsonPath("$.status").value(403));

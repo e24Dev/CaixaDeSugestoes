@@ -22,7 +22,3 @@ springdoc:
     path: /swagger-ui.html
   api-docs:
     path: /v3/api-docs
-app:
-  admin:
-    username: ${ADMIN_USERNAME}
-    password-hash: ${ADMIN_PASSWORD_HASH}

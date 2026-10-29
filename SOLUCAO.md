@@ -1,29 +1,16 @@
-# Checkpoint 08 — Spring Security
+# Checkpoint 08 — administrador no banco
 
-API cumulativa até 08. A etapa 07 permanece disponível sem autenticação.
-Este checkpoint intermediário usa Basic para ensinar autenticação e autorização;
-a etapa 09 substitui Basic por login administrativo e Bearer JWT.
-
-Leia [o tutorial completo](docs/08-spring-security.md). Requisitos: JDK 17 e Docker.
+A migration V3 cria `administrators` sem seed de senha. Configure o banco com
+`docker compose up -d --wait`, execute `./gradlew bootJar` e faça o cadastro inicial:
 
 ```bash
-./gradlew bootJar
-java -jar build/libs/CaixaDeSugestoes-0.0.1-SNAPSHOT.jar --generate-admin-password-hash
+java -jar build/libs/CaixaDeSugestoes-0.0.1-SNAPSHOT.jar --setup-admin
 ```
 
-Configure `ADMIN_USERNAME` e `ADMIN_PASSWORD_HASH` no terminal/IDE que inicia a API.
-O hash gerado deve ficar entre aspas simples para preservar os caracteres `$`.
-Não existe senha padrão nem cadastro público. A API exige essa configuração.
+O comando pede usuário, senha e confirmação sem eco, grava somente BCrypt no
+banco e recusa sobrescrever uma conta já existente. Depois, use `./gradlew bootRun`.
+Não há ADMIN_USERNAME nem ADMIN_PASSWORD_HASH na configuração do servidor.
 
-```bash
-docker compose up -d --wait
-./gradlew bootRun
-```
-
-Consultas e envio de sugestões são públicos; PUT e DELETE exigem ADMIN via Basic.
-As collections usam `adminUsername` e `adminPassword` preenchidos localmente.
-Não exporte senhas reais. Use HTTPS fora de localhost. Swagger: porta 8000,
-`/swagger-ui.html`. Defina `SERVER_PORT` para alterar a porta e ajuste `baseUrl`.
-
-`./gradlew test bootJar` executa a suíte com Docker e gera o JAR. A configuração
-dos testes é isolada e não fornece credenciais padrão para a aplicação.
+Este checkpoint usa Basic somente como etapa pedagógica. PUT/DELETE exigem ADMIN;
+consultas e envio são públicos. A etapa 09 adiciona login JWT e chave automática.
+Leia [o tutorial](docs/08-spring-security.md). Testes precisam de Docker.

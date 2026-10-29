@@ -1,6 +1,3 @@
-app:
-  admin:
-    username: test-admin
 spring:
   datasource:
     hikari:

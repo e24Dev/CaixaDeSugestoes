@@ -17,15 +17,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Testcontainers
 class ContextTest {
     static final String ADMIN_PASSWORD = "Test-Admin-2026!";
-    static final String ADMIN_HASH = new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder(10).encode(ADMIN_PASSWORD);
     @Container static final PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:17");
     @DynamicPropertySource static void database(DynamicPropertyRegistry registry) {
-        registry.add("app.admin.password-hash", () -> ADMIN_HASH);
         registry.add("spring.datasource.url", postgres::getJdbcUrl);
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
     }
     @Autowired JdbcTemplate jdbc;
+    @Autowired br.com.etecalbertoferes.CaixaDeSugestoes.domain.AdminAccountRepository accounts;
+    @Autowired br.com.etecalbertoferes.CaixaDeSugestoes.application.AdminProvisioningService provisioning;
+    @org.junit.jupiter.api.BeforeEach void provisionTestAdmin() {
+        if (accounts.findByUsername("test-admin").isEmpty()) provisioning.provision("test-admin", ADMIN_PASSWORD);
+    }
     @Test void migrationsAndSeeds() {
         assertThat(jdbc.queryForObject("select count(*) from courses", Long.class)).isEqualTo(4L);
         assertThat(jdbc.queryForObject("select count(*) from categories", Long.class)).isEqualTo(3L);
