@@ -44,7 +44,7 @@ public class SuggestionController {
     }
     @Operation(summary = "Substituir campos editáveis", description = "Preserva id e createdAt. Omitir author remove o nome anterior. Curso e categoria são obrigatórios. Falhas não alteram o registro.")
     @ApiResponse(responseCode = "200", description = "Sugestão atualizada")
-    @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "basicAdmin")
+    @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "bearerAuth")
     @ApiResponse(responseCode = "401", description = "Autenticação necessária", content = @Content(schema = @Schema(implementation = ApiError.class)))
     @ApiResponse(responseCode = "403", description = "Acesso negado", content = @Content(schema = @Schema(implementation = ApiError.class)))
     @PutMapping("/{id}")
@@ -53,7 +53,7 @@ public class SuggestionController {
     }
     @Operation(summary = "Excluir sugestão", description = "Exclusão física, preservando curso e categoria. Repetir a exclusão retorna 404.")
     @ApiResponse(responseCode = "204", description = "Excluída, sem corpo", content = @Content)
-    @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "basicAdmin")
+    @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "bearerAuth")
     @ApiResponse(responseCode = "401", description = "Autenticação necessária", content = @Content(schema = @Schema(implementation = ApiError.class)))
     @ApiResponse(responseCode = "403", description = "Acesso negado", content = @Content(schema = @Schema(implementation = ApiError.class)))
     @DeleteMapping("/{id}")

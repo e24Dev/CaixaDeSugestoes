@@ -35,7 +35,9 @@ por exemplo, pertence ao pacote
 | 04 | CRUD e filtros com entradas válidas | Sim |
 | 05 | Validação e erros HTTP uniformes | Sim |
 | 06 | Swagger e OpenAPI | Sim |
-| 07 | Suíte completa, JAR e validação com collections | Sim |
+| 07 | API completa sem autenticação, testes e collections | Sim |
+| 08 | Administrador BCrypt e permissões via Basic intermediário | Sim |
+| 09 | Login administrativo e Bearer JWT | Sim |
 
 Antes de 05, os erros ainda não seguem o contrato final. Antes de 04, o GET de
 sugestões é demonstrativo. Não é uma falha de uma etapa anterior não conter os
@@ -55,7 +57,7 @@ flowchart TB
     subgraph Aluno["Repositório próprio do aluno"]
         Etapa1["01: criar projeto"] --> Etapa2["02: adicionar HTTP"]
         Etapa2 --> Etapa3["03: persistir"]
-        Etapa3 --> Restante["04 a 07: evoluir o mesmo projeto"]
+        Etapa3 --> Restante["04 a 09: evoluir o mesmo projeto"]
     end
     Material -.->|"Ler e implementar"| Etapa1
     Apoio -.->|"Comparar depois de tentar"| Etapa3
@@ -82,7 +84,7 @@ git switch -c 02-api-rest
 ```
 
 Depois do commit de 02, crie `03-postgresql-flyway-jpa` e continue, até
-`07-testes-entrega`. Você não precisa usar branches se ainda estiver aprendendo
+`09-jwt-bearer-token`. Você não precisa usar branches se ainda estiver aprendendo
 Git; commits por etapa no mesmo projeto também preservam sua evolução.
 
 As branches do **seu projeto** contêm seu código cumulativo. As branches de
@@ -96,9 +98,10 @@ O repositório do professor possui pares de branches:
 
 | Nome | Conteúdo |
 | --- | --- |
-| `01-projeto-spring-boot` até `07-testes-entrega` | Material de estudo, sem aplicação executável |
+| `01-projeto-spring-boot` até `09-jwt-bearer-token` | Material de estudo, sem aplicação executável |
 | Mesmo nome com `-impl` | Código acumulado até a etapa indicada |
-| `07-testes-entrega-impl` | API completa, testes, collections e instruções de execução |
+| `07-testes-entrega-impl` | API completa sem autenticação |
+| `09-jwt-bearer-token-impl` | API final com JWT, testes e collections atualizadas |
 
 Depois que o professor publicar as branches, abra um **novo terminal na pasta
 que contém os projetos**, fora do projeto do aluno, e faça:

@@ -48,6 +48,13 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         };
         return respond(status, message, Map.of(), headers, request);
     }
+    @ExceptionHandler(org.springframework.security.core.AuthenticationException.class)
+    public ResponseEntity<Object> invalidCredentials(WebRequest request) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set(HttpHeaders.WWW_AUTHENTICATE, "Bearer");
+        headers.setCacheControl("no-store");
+        return respond(HttpStatus.UNAUTHORIZED, "Credenciais inválidas", Map.of(), headers, request);
+    }
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<Object> notFound(ResourceNotFoundException ex, WebRequest request) {
         return respond(HttpStatus.NOT_FOUND, ex.getMessage(), Map.of(), new HttpHeaders(), request);

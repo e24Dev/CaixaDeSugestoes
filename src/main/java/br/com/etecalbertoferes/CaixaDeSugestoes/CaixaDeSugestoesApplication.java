@@ -10,6 +10,12 @@ public class CaixaDeSugestoesApplication {
             br.com.etecalbertoferes.CaixaDeSugestoes.infrastructure.security.AdminPasswordHash.generate();
             return;
         }
+        if (args.length == 1 && "--generate-jwt-secret".equals(args[0])) {
+            byte[] key = new byte[32];
+            new java.security.SecureRandom().nextBytes(key);
+            System.out.println(java.util.Base64.getEncoder().encodeToString(key));
+            return;
+        }
         SpringApplication.run(CaixaDeSugestoesApplication.class, args);
     }
 }

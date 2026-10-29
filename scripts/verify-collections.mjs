@@ -28,10 +28,13 @@ for (const format of ['postman', 'insomnia']) {
   });
   const requests = format === 'postman' ? collection.item : collection.resources.filter(r => r._type === 'request');
   for (const item of requests) {
+    const variables = { get: key => vars[key], set: (key, value) => { vars[key] = value; } };
+    const pre = format === 'postman' ? item.event.find(e => e.listen === 'prerequest')?.script.exec.join('\n') : item.preRequestScript;
+    if (pre) runInNewContext(pre, { pm: { variables }, insomnia: { environment: variables } }, { timeout: 1000 });
     const request = format === 'postman' ? item.request : item;
     const url = new URL(substitute(request.url));
     if (format === 'insomnia') for (const p of request.parameters) if (!p.disabled) url.searchParams.append(p.name, substitute(p.value));
-    const headers = Object.fromEntries((request.header ?? request.headers).map(h => [h.key ?? h.name, h.value]));
+    const headers = Object.fromEntries((request.header ?? request.headers).map(h => [h.key ?? h.name, substitute(h.value)]));
     const auth = request.auth ?? request.authentication;
     if (auth?.type === 'basic') {
       const username = format === 'postman' ? auth.basic.find(x => x.key === 'username').value : auth.username;
@@ -41,11 +44,10 @@ for (const format of ['postman', 'insomnia']) {
     const rawBody = format === 'postman' ? request.body?.raw : request.body?.text;
     const response = await fetch(url, { method: request.method, headers, body: rawBody ? substitute(rawBody) : undefined });
     const text = await response.text();
-    const variables = { get: key => vars[key], set: (key, value) => { vars[key] = value; } };
     const test = (name, callback) => { try { callback(); } catch (error) { throw new Error(`${format}: ${item.name}: ${name}: ${error.message}`, { cause: error }); } };
-    const script = format === 'postman' ? item.event[0].script.exec.join('\n') : request.afterResponseScript;
+    const script = format === 'postman' ? item.event.find(e => e.listen === 'test').script.exec.join('\n') : request.afterResponseScript;
     runInNewContext(script, {
-      pm: { test, expect, collectionVariables: variables, response: {
+      pm: { test, expect, variables, collectionVariables: variables, response: {
         json: () => JSON.parse(text), text: () => text, to: { have: { status: code => assert.equal(response.status, code) } }
       } },
       insomnia: { test, expect, environment: variables, response: { code: response.status, json: () => JSON.parse(text), text: () => text } }

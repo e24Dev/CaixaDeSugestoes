@@ -1,14 +1,14 @@
 {
   "_type": "export",
   "__export_format": 4,
-  "__export_date": "2026-10-29T18:00:00.000Z",
+  "__export_date": "2026-10-29T21:00:00Z",
   "__export_source": "caixa-de-sugestoes",
   "resources": [
     {
       "_id": "wrk_caixa",
       "_type": "workspace",
-      "name": "Caixa de Sugestões — API",
-      "description": "Execute em ordem numérica. 01 e 02 capturam os IDs dos catálogos; 03 captura a sugestão. 19 exclui somente a sugestão criada nesta execução.",
+      "name": "Caixa de Sugestões — JWT Admin",
+      "description": "Etapa 09: consultas e POST públicos; login exclusivo do administrador, PUT/DELETE com Bearer. Preencha credenciais somente no ambiente local. Execute em ordem.",
       "scope": "collection"
     },
     {
@@ -18,12 +18,13 @@
       "name": "Base Environment",
       "data": {
         "baseUrl": "http://localhost:8000",
+        "adminUsername": "",
+        "adminPassword": "",
+        "accessToken": "",
         "courseId": "",
         "categoryId": "",
         "suggestionId": "",
-        "createdAt": "",
-        "adminUsername": "",
-        "adminPassword": ""
+        "createdAt": ""
       }
     },
     {
@@ -33,12 +34,13 @@
       "name": "01 - Consultar cursos",
       "method": "GET",
       "url": "{{ _.baseUrl }}/api/courses",
-      "body": {},
       "parameters": [],
       "headers": [],
+      "body": {},
       "authentication": {},
-      "metaSortKey": 0,
-      "afterResponseScript": "const expect = insomnia.expect;\nconst set = (key, value) => insomnia.environment.set(key, value);\nconst get = key => insomnia.environment.get(key);\ninsomnia.test('HTTP 200', () => expect(insomnia.response.code).to.eql(200));\nconst data = insomnia.response.json();\nset('courseId', data[0].id);\ninsomnia.test('Contrato da resposta', () => {expect(data.length).to.eql(4);});",
+      "preRequestScript": "",
+      "afterResponseScript": "insomnia.test('HTTP 200', () => insomnia.expect(insomnia.response.code).to.eql(200));\nconst set = (k,v) => insomnia.environment.set(k,v);\nconst get = k => insomnia.environment.get(k);\nconst expect = insomnia.expect;\nconst data = insomnia.response.json();\nset('courseId', data[0].id);\ninsomnia.test('Contrato', () => {expect(data.length).to.eql(4);});",
+      "metaSortKey": 1,
       "description": "Esperado: HTTP 200."
     },
     {
@@ -48,25 +50,22 @@
       "name": "02 - Consultar categorias",
       "method": "GET",
       "url": "{{ _.baseUrl }}/api/categories",
-      "body": {},
       "parameters": [],
       "headers": [],
+      "body": {},
       "authentication": {},
-      "metaSortKey": 1,
-      "afterResponseScript": "const expect = insomnia.expect;\nconst set = (key, value) => insomnia.environment.set(key, value);\nconst get = key => insomnia.environment.get(key);\ninsomnia.test('HTTP 200', () => expect(insomnia.response.code).to.eql(200));\nconst data = insomnia.response.json();\nset('categoryId', data[0].id);\ninsomnia.test('Contrato da resposta', () => {expect(data.length).to.eql(3);});",
+      "preRequestScript": "",
+      "afterResponseScript": "insomnia.test('HTTP 200', () => insomnia.expect(insomnia.response.code).to.eql(200));\nconst set = (k,v) => insomnia.environment.set(k,v);\nconst get = k => insomnia.environment.get(k);\nconst expect = insomnia.expect;\nconst data = insomnia.response.json();\nset('categoryId', data[0].id);\ninsomnia.test('Contrato', () => {expect(data.length).to.eql(3);});",
+      "metaSortKey": 2,
       "description": "Esperado: HTTP 200."
     },
     {
       "_id": "req_caixa_3",
       "_type": "request",
       "parentId": "wrk_caixa",
-      "name": "03 - Criar sugestão identificada",
+      "name": "03 - Login do administrador",
       "method": "POST",
-      "url": "{{ _.baseUrl }}/api/suggestions",
-      "body": {
-        "mimeType": "application/json",
-        "text": "{\n  \"title\": \"Mais tomadas na biblioteca 100%_!\",\n  \"content\": \"Instalar tomadas nas mesas de estudo.\",\n  \"author\": \"  Pessoa Exemplo  \",\n  \"courseId\": {{ _.courseId }},\n  \"categoryId\": {{ _.categoryId }}\n}"
-      },
+      "url": "{{ _.baseUrl }}/api/auth/login",
       "parameters": [],
       "headers": [
         {
@@ -74,49 +73,188 @@
           "value": "application/json"
         }
       ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{{ _.loginBody }}"
+      },
       "authentication": {},
-      "metaSortKey": 2,
-      "afterResponseScript": "const expect = insomnia.expect;\nconst set = (key, value) => insomnia.environment.set(key, value);\nconst get = key => insomnia.environment.get(key);\ninsomnia.test('HTTP 201', () => expect(insomnia.response.code).to.eql(201));\nconst data = insomnia.response.json();\nset('suggestionId', data.id); set('createdAt', data.createdAt);\ninsomnia.test('Contrato da resposta', () => {expect(data.author).to.eql('Pessoa Exemplo'); expect(data.course.name).to.be.a('string'); expect(data.category.name).to.be.a('string');});",
-      "description": "Esperado: HTTP 201."
+      "preRequestScript": "insomnia.environment.set('loginBody', JSON.stringify({username: insomnia.environment.get('adminUsername'), password: insomnia.environment.get('adminPassword')}));",
+      "afterResponseScript": "insomnia.test('HTTP 200', () => insomnia.expect(insomnia.response.code).to.eql(200));\nconst set = (k,v) => insomnia.environment.set(k,v);\nconst get = k => insomnia.environment.get(k);\nconst expect = insomnia.expect;\nconst data = insomnia.response.json();\nset('accessToken', data.accessToken);\ninsomnia.test('Contrato', () => {expect(data.tokenType).to.eql('Bearer'); expect(data.accessToken).to.be.a('string'); expect(data.expiresIn).to.be.a('number');});",
+      "metaSortKey": 3,
+      "description": "Esperado: HTTP 200."
     },
     {
       "_id": "req_caixa_4",
       "_type": "request",
       "parentId": "wrk_caixa",
-      "name": "04 - Consultar sugestão",
-      "method": "GET",
-      "url": "{{ _.baseUrl }}/api/suggestions/{{ _.suggestionId }}",
-      "body": {},
+      "name": "04 - Rejeitar senha incorreta",
+      "method": "POST",
+      "url": "{{ _.baseUrl }}/api/auth/login",
       "parameters": [],
-      "headers": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{{ _.loginBody }}"
+      },
       "authentication": {},
-      "metaSortKey": 3,
-      "afterResponseScript": "const expect = insomnia.expect;\nconst set = (key, value) => insomnia.environment.set(key, value);\nconst get = key => insomnia.environment.get(key);\ninsomnia.test('HTTP 200', () => expect(insomnia.response.code).to.eql(200));\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato da resposta', () => {expect(data.createdAt).to.eql(get('createdAt'));});",
-      "description": "Esperado: HTTP 200."
+      "preRequestScript": "insomnia.environment.set('loginBody', JSON.stringify({username: insomnia.environment.get('adminUsername'), password: 'senha-incorreta-intencional'}));",
+      "afterResponseScript": "insomnia.test('HTTP 401', () => insomnia.expect(insomnia.response.code).to.eql(401));\nconst set = (k,v) => insomnia.environment.set(k,v);\nconst get = k => insomnia.environment.get(k);\nconst expect = insomnia.expect;\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato', () => {expect(data.status).to.eql(401); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');});",
+      "metaSortKey": 4,
+      "description": "Esperado: HTTP 401."
     },
     {
       "_id": "req_caixa_5",
       "_type": "request",
       "parentId": "wrk_caixa",
-      "name": "05 - Listar sugestões",
-      "method": "GET",
-      "url": "{{ _.baseUrl }}/api/suggestions",
-      "body": {},
+      "name": "05 - Rejeitar login vazio",
+      "method": "POST",
+      "url": "{{ _.baseUrl }}/api/auth/login",
       "parameters": [],
-      "headers": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{}"
+      },
       "authentication": {},
-      "metaSortKey": 4,
-      "afterResponseScript": "const expect = insomnia.expect;\nconst set = (key, value) => insomnia.environment.set(key, value);\nconst get = key => insomnia.environment.get(key);\ninsomnia.test('HTTP 200', () => expect(insomnia.response.code).to.eql(200));\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato da resposta', () => {expect(data).to.be.an('array');});",
-      "description": "Esperado: HTTP 200."
+      "preRequestScript": "",
+      "afterResponseScript": "insomnia.test('HTTP 400', () => insomnia.expect(insomnia.response.code).to.eql(400));\nconst set = (k,v) => insomnia.environment.set(k,v);\nconst get = k => insomnia.environment.get(k);\nconst expect = insomnia.expect;\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato', () => {expect(data.status).to.eql(400); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');});",
+      "metaSortKey": 5,
+      "description": "Esperado: HTTP 400."
     },
     {
       "_id": "req_caixa_6",
       "_type": "request",
       "parentId": "wrk_caixa",
-      "name": "06 - Filtrar por curso",
+      "name": "06 - Criar sugestão identificada",
+      "method": "POST",
+      "url": "{{ _.baseUrl }}/api/suggestions",
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"title\": \"Mais tomadas na biblioteca 100%_!\",\n  \"content\": \"Instalar tomadas nas mesas de estudo.\",\n  \"author\": \"  Pessoa Exemplo  \",\n  \"courseId\": {{ _.courseId }},\n  \"categoryId\": {{ _.categoryId }}\n}"
+      },
+      "authentication": {},
+      "preRequestScript": "",
+      "afterResponseScript": "insomnia.test('HTTP 201', () => insomnia.expect(insomnia.response.code).to.eql(201));\nconst set = (k,v) => insomnia.environment.set(k,v);\nconst get = k => insomnia.environment.get(k);\nconst expect = insomnia.expect;\nconst data = insomnia.response.json();\nset('suggestionId', data.id); set('createdAt', data.createdAt);\ninsomnia.test('Contrato', () => {expect(data.author).to.eql('Pessoa Exemplo'); expect(data.course.name).to.be.a('string'); expect(data.category.name).to.be.a('string');});",
+      "metaSortKey": 6,
+      "description": "Esperado: HTTP 201."
+    },
+    {
+      "_id": "req_caixa_7",
+      "_type": "request",
+      "parentId": "wrk_caixa",
+      "name": "07 - Bloquear alteração sem token",
+      "method": "PUT",
+      "url": "{{ _.baseUrl }}/api/suggestions/{{ _.suggestionId }}",
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"title\": \"Mais tomadas na biblioteca 100%_!\",\n  \"content\": \"Instalar tomadas nas mesas de estudo.\",\n  \"author\": \"  Pessoa Exemplo  \",\n  \"courseId\": {{ _.courseId }},\n  \"categoryId\": {{ _.categoryId }}\n}"
+      },
+      "authentication": {},
+      "preRequestScript": "",
+      "afterResponseScript": "insomnia.test('HTTP 401', () => insomnia.expect(insomnia.response.code).to.eql(401));\nconst set = (k,v) => insomnia.environment.set(k,v);\nconst get = k => insomnia.environment.get(k);\nconst expect = insomnia.expect;\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato', () => {expect(data.status).to.eql(401); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');});",
+      "metaSortKey": 7,
+      "description": "Esperado: HTTP 401."
+    },
+    {
+      "_id": "req_caixa_8",
+      "_type": "request",
+      "parentId": "wrk_caixa",
+      "name": "08 - Bloquear exclusão sem token",
+      "method": "DELETE",
+      "url": "{{ _.baseUrl }}/api/suggestions/{{ _.suggestionId }}",
+      "parameters": [],
+      "headers": [],
+      "body": {},
+      "authentication": {},
+      "preRequestScript": "",
+      "afterResponseScript": "insomnia.test('HTTP 401', () => insomnia.expect(insomnia.response.code).to.eql(401));\nconst set = (k,v) => insomnia.environment.set(k,v);\nconst get = k => insomnia.environment.get(k);\nconst expect = insomnia.expect;\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato', () => {expect(data.status).to.eql(401); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');});",
+      "metaSortKey": 8,
+      "description": "Esperado: HTTP 401."
+    },
+    {
+      "_id": "req_caixa_9",
+      "_type": "request",
+      "parentId": "wrk_caixa",
+      "name": "09 - Bloquear token inválido",
+      "method": "DELETE",
+      "url": "{{ _.baseUrl }}/api/suggestions/{{ _.suggestionId }}",
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer token-invalido"
+        }
+      ],
+      "body": {},
+      "authentication": {},
+      "preRequestScript": "",
+      "afterResponseScript": "insomnia.test('HTTP 401', () => insomnia.expect(insomnia.response.code).to.eql(401));\nconst set = (k,v) => insomnia.environment.set(k,v);\nconst get = k => insomnia.environment.get(k);\nconst expect = insomnia.expect;\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato', () => {expect(data.status).to.eql(401); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');});",
+      "metaSortKey": 9,
+      "description": "Esperado: HTTP 401."
+    },
+    {
+      "_id": "req_caixa_10",
+      "_type": "request",
+      "parentId": "wrk_caixa",
+      "name": "10 - Consultar sugestão",
+      "method": "GET",
+      "url": "{{ _.baseUrl }}/api/suggestions/{{ _.suggestionId }}",
+      "parameters": [],
+      "headers": [],
+      "body": {},
+      "authentication": {},
+      "preRequestScript": "",
+      "afterResponseScript": "insomnia.test('HTTP 200', () => insomnia.expect(insomnia.response.code).to.eql(200));\nconst set = (k,v) => insomnia.environment.set(k,v);\nconst get = k => insomnia.environment.get(k);\nconst expect = insomnia.expect;\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato', () => {expect(data.createdAt).to.eql(get('createdAt'));});",
+      "metaSortKey": 10,
+      "description": "Esperado: HTTP 200."
+    },
+    {
+      "_id": "req_caixa_11",
+      "_type": "request",
+      "parentId": "wrk_caixa",
+      "name": "11 - Listar sugestões",
       "method": "GET",
       "url": "{{ _.baseUrl }}/api/suggestions",
+      "parameters": [],
+      "headers": [],
       "body": {},
+      "authentication": {},
+      "preRequestScript": "",
+      "afterResponseScript": "insomnia.test('HTTP 200', () => insomnia.expect(insomnia.response.code).to.eql(200));\nconst set = (k,v) => insomnia.environment.set(k,v);\nconst get = k => insomnia.environment.get(k);\nconst expect = insomnia.expect;\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato', () => {expect(data).to.be.an('array');});",
+      "metaSortKey": 11,
+      "description": "Esperado: HTTP 200."
+    },
+    {
+      "_id": "req_caixa_12",
+      "_type": "request",
+      "parentId": "wrk_caixa",
+      "name": "12 - Filtrar por curso",
+      "method": "GET",
+      "url": "{{ _.baseUrl }}/api/suggestions",
       "parameters": [
         {
           "name": "courseId",
@@ -125,19 +263,20 @@
         }
       ],
       "headers": [],
+      "body": {},
       "authentication": {},
-      "metaSortKey": 5,
-      "afterResponseScript": "const expect = insomnia.expect;\nconst set = (key, value) => insomnia.environment.set(key, value);\nconst get = key => insomnia.environment.get(key);\ninsomnia.test('HTTP 200', () => expect(insomnia.response.code).to.eql(200));\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato da resposta', () => {expect(data.every(x => String(x.course.id) === String(get('courseId')))).to.eql(true);});",
+      "preRequestScript": "",
+      "afterResponseScript": "insomnia.test('HTTP 200', () => insomnia.expect(insomnia.response.code).to.eql(200));\nconst set = (k,v) => insomnia.environment.set(k,v);\nconst get = k => insomnia.environment.get(k);\nconst expect = insomnia.expect;\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato', () => {expect(data.every(x => String(x.course.id) === String(get('courseId')))).to.eql(true);});",
+      "metaSortKey": 12,
       "description": "Esperado: HTTP 200."
     },
     {
-      "_id": "req_caixa_7",
+      "_id": "req_caixa_13",
       "_type": "request",
       "parentId": "wrk_caixa",
-      "name": "07 - Filtrar por categoria",
+      "name": "13 - Filtrar por categoria",
       "method": "GET",
       "url": "{{ _.baseUrl }}/api/suggestions",
-      "body": {},
       "parameters": [
         {
           "name": "categoryId",
@@ -146,19 +285,20 @@
         }
       ],
       "headers": [],
+      "body": {},
       "authentication": {},
-      "metaSortKey": 6,
-      "afterResponseScript": "const expect = insomnia.expect;\nconst set = (key, value) => insomnia.environment.set(key, value);\nconst get = key => insomnia.environment.get(key);\ninsomnia.test('HTTP 200', () => expect(insomnia.response.code).to.eql(200));\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato da resposta', () => {expect(data.every(x => String(x.category.id) === String(get('categoryId')))).to.eql(true);});",
+      "preRequestScript": "",
+      "afterResponseScript": "insomnia.test('HTTP 200', () => insomnia.expect(insomnia.response.code).to.eql(200));\nconst set = (k,v) => insomnia.environment.set(k,v);\nconst get = k => insomnia.environment.get(k);\nconst expect = insomnia.expect;\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato', () => {expect(data.every(x => String(x.category.id) === String(get('categoryId')))).to.eql(true);});",
+      "metaSortKey": 13,
       "description": "Esperado: HTTP 200."
     },
     {
-      "_id": "req_caixa_8",
+      "_id": "req_caixa_14",
       "_type": "request",
       "parentId": "wrk_caixa",
-      "name": "08 - Buscar texto literal e combinar filtros",
+      "name": "14 - Buscar texto literal e combinar filtros",
       "method": "GET",
       "url": "{{ _.baseUrl }}/api/suggestions",
-      "body": {},
       "parameters": [
         {
           "name": "courseId",
@@ -177,19 +317,20 @@
         }
       ],
       "headers": [],
+      "body": {},
       "authentication": {},
-      "metaSortKey": 7,
-      "afterResponseScript": "const expect = insomnia.expect;\nconst set = (key, value) => insomnia.environment.set(key, value);\nconst get = key => insomnia.environment.get(key);\ninsomnia.test('HTTP 200', () => expect(insomnia.response.code).to.eql(200));\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato da resposta', () => {expect(data.some(x => String(x.id) === String(get('suggestionId')))).to.eql(true);});",
+      "preRequestScript": "",
+      "afterResponseScript": "insomnia.test('HTTP 200', () => insomnia.expect(insomnia.response.code).to.eql(200));\nconst set = (k,v) => insomnia.environment.set(k,v);\nconst get = k => insomnia.environment.get(k);\nconst expect = insomnia.expect;\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato', () => {expect(data.some(x => String(x.id) === String(get('suggestionId')))).to.eql(true);});",
+      "metaSortKey": 14,
       "description": "Esperado: HTTP 200."
     },
     {
-      "_id": "req_caixa_9",
+      "_id": "req_caixa_15",
       "_type": "request",
       "parentId": "wrk_caixa",
-      "name": "09 - Filtro sem resultado",
+      "name": "15 - Filtro sem resultado",
       "method": "GET",
       "url": "{{ _.baseUrl }}/api/suggestions",
-      "body": {},
       "parameters": [
         {
           "name": "courseId",
@@ -198,22 +339,48 @@
         }
       ],
       "headers": [],
+      "body": {},
       "authentication": {},
-      "metaSortKey": 8,
-      "afterResponseScript": "const expect = insomnia.expect;\nconst set = (key, value) => insomnia.environment.set(key, value);\nconst get = key => insomnia.environment.get(key);\ninsomnia.test('HTTP 200', () => expect(insomnia.response.code).to.eql(200));\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato da resposta', () => {expect(data).to.eql([]);});",
+      "preRequestScript": "",
+      "afterResponseScript": "insomnia.test('HTTP 200', () => insomnia.expect(insomnia.response.code).to.eql(200));\nconst set = (k,v) => insomnia.environment.set(k,v);\nconst get = k => insomnia.environment.get(k);\nconst expect = insomnia.expect;\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato', () => {expect(data).to.eql([]);});",
+      "metaSortKey": 15,
       "description": "Esperado: HTTP 200."
     },
     {
-      "_id": "req_caixa_10",
+      "_id": "req_caixa_16",
       "_type": "request",
       "parentId": "wrk_caixa",
-      "name": "10 - Atualizar para anônima",
+      "name": "16 - Atualizar para anônima",
       "method": "PUT",
       "url": "{{ _.baseUrl }}/api/suggestions/{{ _.suggestionId }}",
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.accessToken }}"
+        }
+      ],
       "body": {
         "mimeType": "application/json",
         "text": "{\n  \"title\": \"Novas tomadas na biblioteca 100%_!\",\n  \"content\": \"Instalar tomadas nas mesas de estudo.\",\n  \"author\": \"   \",\n  \"courseId\": {{ _.courseId }},\n  \"categoryId\": {{ _.categoryId }}\n}"
       },
+      "authentication": {},
+      "preRequestScript": "",
+      "afterResponseScript": "insomnia.test('HTTP 200', () => insomnia.expect(insomnia.response.code).to.eql(200));\nconst set = (k,v) => insomnia.environment.set(k,v);\nconst get = k => insomnia.environment.get(k);\nconst expect = insomnia.expect;\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato', () => {expect(data.author).to.eql('Anônimo'); expect(data.createdAt).to.eql(get('createdAt'));});",
+      "metaSortKey": 16,
+      "description": "Esperado: HTTP 200."
+    },
+    {
+      "_id": "req_caixa_17",
+      "_type": "request",
+      "parentId": "wrk_caixa",
+      "name": "17 - Rejeitar campos inválidos",
+      "method": "POST",
+      "url": "{{ _.baseUrl }}/api/suggestions",
       "parameters": [],
       "headers": [
         {
@@ -221,46 +388,23 @@
           "value": "application/json"
         }
       ],
-      "authentication": {
-        "type": "basic",
-        "username": "{{ _.adminUsername }}",
-        "password": "{{ _.adminPassword }}"
-      },
-      "metaSortKey": 9,
-      "afterResponseScript": "const expect = insomnia.expect;\nconst set = (key, value) => insomnia.environment.set(key, value);\nconst get = key => insomnia.environment.get(key);\ninsomnia.test('HTTP 200', () => expect(insomnia.response.code).to.eql(200));\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato da resposta', () => {expect(data.author).to.eql('Anônimo'); expect(data.createdAt).to.eql(get('createdAt'));});",
-      "description": "Esperado: HTTP 200."
-    },
-    {
-      "_id": "req_caixa_11",
-      "_type": "request",
-      "parentId": "wrk_caixa",
-      "name": "11 - Rejeitar campos inválidos",
-      "method": "POST",
-      "url": "{{ _.baseUrl }}/api/suggestions",
       "body": {
         "mimeType": "application/json",
         "text": "{\"title\":\" \",\"content\":\"\",\"courseId\":0,\"categoryId\":-1}"
       },
-      "parameters": [],
-      "headers": [
-        {
-          "name": "Content-Type",
-          "value": "application/json"
-        }
-      ],
       "authentication": {},
-      "metaSortKey": 10,
-      "afterResponseScript": "const expect = insomnia.expect;\nconst set = (key, value) => insomnia.environment.set(key, value);\nconst get = key => insomnia.environment.get(key);\ninsomnia.test('HTTP 400', () => expect(insomnia.response.code).to.eql(400));\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato da resposta', () => {expect(data.status).to.eql(400); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');expect(data.fieldErrors).to.have.property('title');});",
+      "preRequestScript": "",
+      "afterResponseScript": "insomnia.test('HTTP 400', () => insomnia.expect(insomnia.response.code).to.eql(400));\nconst set = (k,v) => insomnia.environment.set(k,v);\nconst get = k => insomnia.environment.get(k);\nconst expect = insomnia.expect;\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato', () => {expect(data.status).to.eql(400); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');expect(data.fieldErrors).to.have.property('title');});",
+      "metaSortKey": 17,
       "description": "Esperado: HTTP 400."
     },
     {
-      "_id": "req_caixa_12",
+      "_id": "req_caixa_18",
       "_type": "request",
       "parentId": "wrk_caixa",
-      "name": "12 - Rejeitar filtro inválido",
+      "name": "18 - Rejeitar filtro inválido",
       "method": "GET",
       "url": "{{ _.baseUrl }}/api/suggestions",
-      "body": {},
       "parameters": [
         {
           "name": "courseId",
@@ -269,37 +413,60 @@
         }
       ],
       "headers": [],
+      "body": {},
       "authentication": {},
-      "metaSortKey": 11,
-      "afterResponseScript": "const expect = insomnia.expect;\nconst set = (key, value) => insomnia.environment.set(key, value);\nconst get = key => insomnia.environment.get(key);\ninsomnia.test('HTTP 400', () => expect(insomnia.response.code).to.eql(400));\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato da resposta', () => {expect(data.status).to.eql(400); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');});",
+      "preRequestScript": "",
+      "afterResponseScript": "insomnia.test('HTTP 400', () => insomnia.expect(insomnia.response.code).to.eql(400));\nconst set = (k,v) => insomnia.environment.set(k,v);\nconst get = k => insomnia.environment.get(k);\nconst expect = insomnia.expect;\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato', () => {expect(data.status).to.eql(400); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');});",
+      "metaSortKey": 18,
       "description": "Esperado: HTTP 400."
     },
     {
-      "_id": "req_caixa_13",
+      "_id": "req_caixa_19",
       "_type": "request",
       "parentId": "wrk_caixa",
-      "name": "13 - Rejeitar ID inválido",
+      "name": "19 - Rejeitar ID inválido",
       "method": "GET",
       "url": "{{ _.baseUrl }}/api/suggestions/abc",
-      "body": {},
       "parameters": [],
       "headers": [],
+      "body": {},
       "authentication": {},
-      "metaSortKey": 12,
-      "afterResponseScript": "const expect = insomnia.expect;\nconst set = (key, value) => insomnia.environment.set(key, value);\nconst get = key => insomnia.environment.get(key);\ninsomnia.test('HTTP 400', () => expect(insomnia.response.code).to.eql(400));\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato da resposta', () => {expect(data.status).to.eql(400); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');});",
+      "preRequestScript": "",
+      "afterResponseScript": "insomnia.test('HTTP 400', () => insomnia.expect(insomnia.response.code).to.eql(400));\nconst set = (k,v) => insomnia.environment.set(k,v);\nconst get = k => insomnia.environment.get(k);\nconst expect = insomnia.expect;\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato', () => {expect(data.status).to.eql(400); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');});",
+      "metaSortKey": 19,
       "description": "Esperado: HTTP 400."
     },
     {
-      "_id": "req_caixa_14",
+      "_id": "req_caixa_20",
       "_type": "request",
       "parentId": "wrk_caixa",
-      "name": "14 - Categoria inexistente",
+      "name": "20 - Categoria inexistente",
       "method": "POST",
       "url": "{{ _.baseUrl }}/api/suggestions",
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
       "body": {
         "mimeType": "application/json",
         "text": "{\n  \"title\": \"Mais tomadas na biblioteca 100%_!\",\n  \"content\": \"Instalar tomadas nas mesas de estudo.\",\n  \"author\": \"  Pessoa Exemplo  \",\n  \"courseId\": {{ _.courseId }},\n  \"categoryId\": 9223372036854775807\n}"
       },
+      "authentication": {},
+      "preRequestScript": "",
+      "afterResponseScript": "insomnia.test('HTTP 404', () => insomnia.expect(insomnia.response.code).to.eql(404));\nconst set = (k,v) => insomnia.environment.set(k,v);\nconst get = k => insomnia.environment.get(k);\nconst expect = insomnia.expect;\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato', () => {expect(data.status).to.eql(404); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');});",
+      "metaSortKey": 20,
+      "description": "Esperado: HTTP 404."
+    },
+    {
+      "_id": "req_caixa_21",
+      "_type": "request",
+      "parentId": "wrk_caixa",
+      "name": "21 - Curso inexistente",
+      "method": "POST",
+      "url": "{{ _.baseUrl }}/api/suggestions",
       "parameters": [],
       "headers": [
         {
@@ -307,22 +474,23 @@
           "value": "application/json"
         }
       ],
-      "authentication": {},
-      "metaSortKey": 13,
-      "afterResponseScript": "const expect = insomnia.expect;\nconst set = (key, value) => insomnia.environment.set(key, value);\nconst get = key => insomnia.environment.get(key);\ninsomnia.test('HTTP 404', () => expect(insomnia.response.code).to.eql(404));\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato da resposta', () => {expect(data.status).to.eql(404); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');});",
-      "description": "Esperado: HTTP 404."
-    },
-    {
-      "_id": "req_caixa_15",
-      "_type": "request",
-      "parentId": "wrk_caixa",
-      "name": "15 - Curso inexistente",
-      "method": "POST",
-      "url": "{{ _.baseUrl }}/api/suggestions",
       "body": {
         "mimeType": "application/json",
         "text": "{\n  \"title\": \"Mais tomadas na biblioteca 100%_!\",\n  \"content\": \"Instalar tomadas nas mesas de estudo.\",\n  \"author\": \"  Pessoa Exemplo  \",\n  \"courseId\": 9223372036854775807,\n  \"categoryId\": {{ _.categoryId }}\n}"
       },
+      "authentication": {},
+      "preRequestScript": "",
+      "afterResponseScript": "insomnia.test('HTTP 404', () => insomnia.expect(insomnia.response.code).to.eql(404));\nconst set = (k,v) => insomnia.environment.set(k,v);\nconst get = k => insomnia.environment.get(k);\nconst expect = insomnia.expect;\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato', () => {expect(data.status).to.eql(404); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');});",
+      "metaSortKey": 21,
+      "description": "Esperado: HTTP 404."
+    },
+    {
+      "_id": "req_caixa_22",
+      "_type": "request",
+      "parentId": "wrk_caixa",
+      "name": "22 - JSON truncado",
+      "method": "POST",
+      "url": "{{ _.baseUrl }}/api/suggestions",
       "parameters": [],
       "headers": [
         {
@@ -330,22 +498,23 @@
           "value": "application/json"
         }
       ],
-      "authentication": {},
-      "metaSortKey": 14,
-      "afterResponseScript": "const expect = insomnia.expect;\nconst set = (key, value) => insomnia.environment.set(key, value);\nconst get = key => insomnia.environment.get(key);\ninsomnia.test('HTTP 404', () => expect(insomnia.response.code).to.eql(404));\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato da resposta', () => {expect(data.status).to.eql(404); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');});",
-      "description": "Esperado: HTTP 404."
-    },
-    {
-      "_id": "req_caixa_16",
-      "_type": "request",
-      "parentId": "wrk_caixa",
-      "name": "16 - JSON truncado",
-      "method": "POST",
-      "url": "{{ _.baseUrl }}/api/suggestions",
       "body": {
         "mimeType": "application/json",
         "text": "{\"title\":"
       },
+      "authentication": {},
+      "preRequestScript": "",
+      "afterResponseScript": "insomnia.test('HTTP 400', () => insomnia.expect(insomnia.response.code).to.eql(400));\nconst set = (k,v) => insomnia.environment.set(k,v);\nconst get = k => insomnia.environment.get(k);\nconst expect = insomnia.expect;\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato', () => {expect(data.status).to.eql(400); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');});",
+      "metaSortKey": 22,
+      "description": "Esperado: HTTP 400."
+    },
+    {
+      "_id": "req_caixa_23",
+      "_type": "request",
+      "parentId": "wrk_caixa",
+      "name": "23 - Método não permitido",
+      "method": "PATCH",
+      "url": "{{ _.baseUrl }}/api/suggestions/{{ _.suggestionId }}",
       "parameters": [],
       "headers": [
         {
@@ -353,45 +522,23 @@
           "value": "application/json"
         }
       ],
-      "authentication": {},
-      "metaSortKey": 15,
-      "afterResponseScript": "const expect = insomnia.expect;\nconst set = (key, value) => insomnia.environment.set(key, value);\nconst get = key => insomnia.environment.get(key);\ninsomnia.test('HTTP 400', () => expect(insomnia.response.code).to.eql(400));\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato da resposta', () => {expect(data.status).to.eql(400); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');});",
-      "description": "Esperado: HTTP 400."
-    },
-    {
-      "_id": "req_caixa_17",
-      "_type": "request",
-      "parentId": "wrk_caixa",
-      "name": "17 - Método não permitido",
-      "method": "PATCH",
-      "url": "{{ _.baseUrl }}/api/suggestions/{{ _.suggestionId }}",
       "body": {
         "mimeType": "application/json",
         "text": "{\n  \"title\": \"Mais tomadas na biblioteca 100%_!\",\n  \"content\": \"Instalar tomadas nas mesas de estudo.\",\n  \"author\": \"  Pessoa Exemplo  \",\n  \"courseId\": {{ _.courseId }},\n  \"categoryId\": {{ _.categoryId }}\n}"
       },
-      "parameters": [],
-      "headers": [
-        {
-          "name": "Content-Type",
-          "value": "application/json"
-        }
-      ],
       "authentication": {},
-      "metaSortKey": 16,
-      "afterResponseScript": "const expect = insomnia.expect;\nconst set = (key, value) => insomnia.environment.set(key, value);\nconst get = key => insomnia.environment.get(key);\ninsomnia.test('HTTP 405', () => expect(insomnia.response.code).to.eql(405));\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato da resposta', () => {expect(data.status).to.eql(405); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');});",
+      "preRequestScript": "",
+      "afterResponseScript": "insomnia.test('HTTP 405', () => insomnia.expect(insomnia.response.code).to.eql(405));\nconst set = (k,v) => insomnia.environment.set(k,v);\nconst get = k => insomnia.environment.get(k);\nconst expect = insomnia.expect;\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato', () => {expect(data.status).to.eql(405); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');});",
+      "metaSortKey": 23,
       "description": "Esperado: HTTP 405."
     },
     {
-      "_id": "req_caixa_18",
+      "_id": "req_caixa_24",
       "_type": "request",
       "parentId": "wrk_caixa",
-      "name": "18 - Tipo de conteúdo inválido",
+      "name": "24 - Tipo de conteúdo inválido",
       "method": "POST",
       "url": "{{ _.baseUrl }}/api/suggestions",
-      "body": {
-        "mimeType": "text/plain",
-        "text": "texto"
-      },
       "parameters": [],
       "headers": [
         {
@@ -399,104 +546,116 @@
           "value": "text/plain"
         }
       ],
+      "body": {
+        "mimeType": "text/plain",
+        "text": "texto"
+      },
       "authentication": {},
-      "metaSortKey": 17,
-      "afterResponseScript": "const expect = insomnia.expect;\nconst set = (key, value) => insomnia.environment.set(key, value);\nconst get = key => insomnia.environment.get(key);\ninsomnia.test('HTTP 415', () => expect(insomnia.response.code).to.eql(415));\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato da resposta', () => {expect(data.status).to.eql(415); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');});",
+      "preRequestScript": "",
+      "afterResponseScript": "insomnia.test('HTTP 415', () => insomnia.expect(insomnia.response.code).to.eql(415));\nconst set = (k,v) => insomnia.environment.set(k,v);\nconst get = k => insomnia.environment.get(k);\nconst expect = insomnia.expect;\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato', () => {expect(data.status).to.eql(415); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');});",
+      "metaSortKey": 24,
       "description": "Esperado: HTTP 415."
     },
     {
-      "_id": "req_caixa_19",
+      "_id": "req_caixa_25",
       "_type": "request",
       "parentId": "wrk_caixa",
-      "name": "19 - Excluir sugestão",
+      "name": "25 - Excluir sugestão",
       "method": "DELETE",
       "url": "{{ _.baseUrl }}/api/suggestions/{{ _.suggestionId }}",
-      "body": {},
       "parameters": [],
-      "headers": [],
-      "authentication": {
-        "type": "basic",
-        "username": "{{ _.adminUsername }}",
-        "password": "{{ _.adminPassword }}"
-      },
-      "metaSortKey": 18,
-      "afterResponseScript": "const expect = insomnia.expect;\nconst set = (key, value) => insomnia.environment.set(key, value);\nconst get = key => insomnia.environment.get(key);\ninsomnia.test('HTTP 204', () => expect(insomnia.response.code).to.eql(204));\ninsomnia.test('Sem corpo', () => expect(insomnia.response.text()).to.eql(''));",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.accessToken }}"
+        }
+      ],
+      "body": {},
+      "authentication": {},
+      "preRequestScript": "",
+      "afterResponseScript": "insomnia.test('HTTP 204', () => insomnia.expect(insomnia.response.code).to.eql(204));\nconst set = (k,v) => insomnia.environment.set(k,v);\nconst get = k => insomnia.environment.get(k);\nconst expect = insomnia.expect;\ninsomnia.test('Sem corpo', () => expect(insomnia.response.text()).to.eql(''));",
+      "metaSortKey": 25,
       "description": "Esperado: HTTP 204."
     },
     {
-      "_id": "req_caixa_20",
+      "_id": "req_caixa_26",
       "_type": "request",
       "parentId": "wrk_caixa",
-      "name": "20 - Confirmar exclusão",
+      "name": "26 - Confirmar exclusão",
       "method": "GET",
       "url": "{{ _.baseUrl }}/api/suggestions/{{ _.suggestionId }}",
-      "body": {},
       "parameters": [],
       "headers": [],
+      "body": {},
       "authentication": {},
-      "metaSortKey": 19,
-      "afterResponseScript": "const expect = insomnia.expect;\nconst set = (key, value) => insomnia.environment.set(key, value);\nconst get = key => insomnia.environment.get(key);\ninsomnia.test('HTTP 404', () => expect(insomnia.response.code).to.eql(404));\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato da resposta', () => {expect(data.status).to.eql(404); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');});",
+      "preRequestScript": "",
+      "afterResponseScript": "insomnia.test('HTTP 404', () => insomnia.expect(insomnia.response.code).to.eql(404));\nconst set = (k,v) => insomnia.environment.set(k,v);\nconst get = k => insomnia.environment.get(k);\nconst expect = insomnia.expect;\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato', () => {expect(data.status).to.eql(404); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');});",
+      "metaSortKey": 26,
       "description": "Esperado: HTTP 404."
     },
     {
-      "_id": "req_caixa_21",
+      "_id": "req_caixa_27",
       "_type": "request",
       "parentId": "wrk_caixa",
-      "name": "21 - Repetir exclusão",
+      "name": "27 - Repetir exclusão",
       "method": "DELETE",
       "url": "{{ _.baseUrl }}/api/suggestions/{{ _.suggestionId }}",
-      "body": {},
       "parameters": [],
-      "headers": [],
-      "authentication": {
-        "type": "basic",
-        "username": "{{ _.adminUsername }}",
-        "password": "{{ _.adminPassword }}"
-      },
-      "metaSortKey": 20,
-      "afterResponseScript": "const expect = insomnia.expect;\nconst set = (key, value) => insomnia.environment.set(key, value);\nconst get = key => insomnia.environment.get(key);\ninsomnia.test('HTTP 404', () => expect(insomnia.response.code).to.eql(404));\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato da resposta', () => {expect(data.status).to.eql(404); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');});",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.accessToken }}"
+        }
+      ],
+      "body": {},
+      "authentication": {},
+      "preRequestScript": "",
+      "afterResponseScript": "insomnia.test('HTTP 404', () => insomnia.expect(insomnia.response.code).to.eql(404));\nconst set = (k,v) => insomnia.environment.set(k,v);\nconst get = k => insomnia.environment.get(k);\nconst expect = insomnia.expect;\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato', () => {expect(data.status).to.eql(404); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');});",
+      "metaSortKey": 27,
       "description": "Esperado: HTTP 404."
     },
     {
-      "_id": "req_caixa_22",
+      "_id": "req_caixa_28",
       "_type": "request",
       "parentId": "wrk_caixa",
-      "name": "22 - Atualizar excluída",
+      "name": "28 - Atualizar excluída",
       "method": "PUT",
       "url": "{{ _.baseUrl }}/api/suggestions/{{ _.suggestionId }}",
-      "body": {
-        "mimeType": "application/json",
-        "text": "{\n  \"title\": \"Mais tomadas na biblioteca 100%_!\",\n  \"content\": \"Instalar tomadas nas mesas de estudo.\",\n  \"author\": \"  Pessoa Exemplo  \",\n  \"courseId\": {{ _.courseId }},\n  \"categoryId\": {{ _.categoryId }}\n}"
-      },
       "parameters": [],
       "headers": [
         {
           "name": "Content-Type",
           "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.accessToken }}"
         }
       ],
-      "authentication": {
-        "type": "basic",
-        "username": "{{ _.adminUsername }}",
-        "password": "{{ _.adminPassword }}"
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"title\": \"Mais tomadas na biblioteca 100%_!\",\n  \"content\": \"Instalar tomadas nas mesas de estudo.\",\n  \"author\": \"  Pessoa Exemplo  \",\n  \"courseId\": {{ _.courseId }},\n  \"categoryId\": {{ _.categoryId }}\n}"
       },
-      "metaSortKey": 21,
-      "afterResponseScript": "const expect = insomnia.expect;\nconst set = (key, value) => insomnia.environment.set(key, value);\nconst get = key => insomnia.environment.get(key);\ninsomnia.test('HTTP 404', () => expect(insomnia.response.code).to.eql(404));\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato da resposta', () => {expect(data.status).to.eql(404); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');});",
+      "authentication": {},
+      "preRequestScript": "",
+      "afterResponseScript": "insomnia.test('HTTP 404', () => insomnia.expect(insomnia.response.code).to.eql(404));\nconst set = (k,v) => insomnia.environment.set(k,v);\nconst get = k => insomnia.environment.get(k);\nconst expect = insomnia.expect;\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato', () => {expect(data.status).to.eql(404); expect(data).to.have.property('timestamp'); expect(data.fieldErrors).to.be.an('object');});",
+      "metaSortKey": 28,
       "description": "Esperado: HTTP 404."
     },
     {
-      "_id": "req_caixa_23",
+      "_id": "req_caixa_29",
       "_type": "request",
       "parentId": "wrk_caixa",
-      "name": "23 - OpenAPI JSON",
+      "name": "29 - OpenAPI JSON",
       "method": "GET",
       "url": "{{ _.baseUrl }}/v3/api-docs",
-      "body": {},
       "parameters": [],
       "headers": [],
+      "body": {},
       "authentication": {},
-      "metaSortKey": 22,
-      "afterResponseScript": "const expect = insomnia.expect;\nconst set = (key, value) => insomnia.environment.set(key, value);\nconst get = key => insomnia.environment.get(key);\ninsomnia.test('HTTP 200', () => expect(insomnia.response.code).to.eql(200));\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato da resposta', () => {expect(data.paths).to.have.property('/api/suggestions');});",
+      "preRequestScript": "",
+      "afterResponseScript": "insomnia.test('HTTP 200', () => insomnia.expect(insomnia.response.code).to.eql(200));\nconst set = (k,v) => insomnia.environment.set(k,v);\nconst get = k => insomnia.environment.get(k);\nconst expect = insomnia.expect;\nconst data = insomnia.response.json();\n\ninsomnia.test('Contrato', () => {expect(data.paths).to.have.property('/api/suggestions');});",
+      "metaSortKey": 29,
       "description": "Esperado: HTTP 200."
     }
   ]

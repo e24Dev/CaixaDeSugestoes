@@ -23,7 +23,10 @@ Uma pessoa percebe que faltam tomadas na biblioteca. Ela escolhe um curso e a ca
 | Que tipo de manifestação é? | Uma categoria obrigatória |
 | Como consultar novamente? | id gerado pelo banco |
 
-O nome informado é apenas um texto, não uma identidade autenticada. Não há usuários, login, curtidas ou triagem. As rotas não possuem controle de propriedade nesta versão.
+O nome informado é apenas um texto, não uma identidade autenticada. O contrato base das etapas 01–07 não tem login. Em 08–09, um administrador
+provisionado por ambiente passa a editar/excluir sugestões; o público continua
+consultando e enviando sem autenticação.
+Não há cadastro público de usuários, curtidas, controle de propriedade ou triagem.
 
 ## 2. Leia o diagrama entidade-relacionamento
 
@@ -283,3 +286,24 @@ sequenceDiagram
 - Consegue prever os códigos HTTP nos cenários de sucesso, validação e ausência.
 
 **Próximo passo:** [ligar o motor da aplicação](01-projeto-spring-boot.md).
+
+## Evolução do acesso nos módulos 08–09
+
+O modelo de sugestões e os catálogos não mudam. A conta administrativa é
+provisionada pelo ambiente com hash BCrypt, sem tabela de usuários ou seed de
+senha. O novo contrato adiciona `POST /api/auth/login` e restringe PUT/DELETE.
+
+```mermaid
+flowchart LR
+    Publico["Comunidade sem login"] --> Ler["GET sugestões e catálogos"]
+    Publico --> Enviar["POST sugestão anônima ou identificada"]
+    Admin["Administrador"] --> Login["POST auth/login com credenciais"]
+    Login --> Token["JWT assinado com validade"]
+    Token --> Alterar["PUT e DELETE com Bearer e ADMIN"]
+```
+
+O login retorna 200 com accessToken/tokenType/expiresIn, 400 para entrada inválida
+e 401 para credenciais inválidas. Nas operações protegidas, ausência ou falha de
+autenticação resulta em 401; token válido sem ADMIN, 403. Só depois da autorização
+ocorrem os resultados de negócio descritos acima, como 400, 404, 200 ou 204.
+Consulte [08](08-spring-security.md) e [09](09-jwt-bearer-token.md) para implementar.

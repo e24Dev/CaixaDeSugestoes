@@ -26,3 +26,6 @@ app:
   admin:
     username: ${ADMIN_USERNAME}
     password-hash: ${ADMIN_PASSWORD_HASH}
+  jwt:
+    secret-base64: ${JWT_SECRET_BASE64}
+    ttl-seconds: ${JWT_TTL_SECONDS:900}
