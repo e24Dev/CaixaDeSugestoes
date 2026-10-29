@@ -1,43 +1,85 @@
-# 08 — Spring Security e administrador
+# 08 — Spring Security e administrador no banco
 
 [Roteiro](../README.md) · [Contrato](00-modelo-dados.md) · [Etapa anterior](07-testes-entrega.md)
 
 ## Missão
 
-Proteger alteração e exclusão de sugestões com um administrador provisionado pelo
-professor. Consultas e envio continuam públicos. Continue o projeto do módulo 07.
-O checkpoint é `08-spring-security-impl`.
+Continue o projeto do módulo 07. A migration V3 cria a tabela `administrators`,
+mas não cadastra credenciais. O comando `--setup-admin` pede usuário e senha,
+aplica BCrypt e grava a primeira conta. Não há cadastro HTTP público de usuários.
+O checkpoint desta etapa é `08-spring-security-impl`.
 
-Neste módulo intermediário, HTTP Basic permite estudar autenticação, BCrypt e
-permissões. No módulo 09, ele será desabilitado e substituído pelo login com JWT.
-Não há cadastro público de usuários nem vínculo entre o texto `author` e a conta.
+Nesta etapa, HTTP Basic permite estudar autenticação e permissões. No módulo 09,
+Basic será substituído por login e Bearer JWT. Consultas e envio de sugestões
+continuam públicos; somente alteração e exclusão exigem ADMIN. O texto author
+continua independente da identidade administrativa.
 
 ```mermaid
 flowchart TD
     Request["Requisição"] --> Rota{"PUT ou DELETE de sugestão?"}
-    Rota -->|"Não"| Publico["Acesso público ao contrato existente"]
-    Rota -->|"Sim"| Login{"Credencial válida?"}
+    Rota -->|"Não"| Publico["Contrato público existente"]
+    Rota -->|"Sim"| Login{"Credencial corresponde a<br/>administrador ativo no banco?"}
     Login -->|"Não"| Unauthorized["401: autenticação necessária"]
     Login -->|"Sim"| Papel{"Papel ADMIN?"}
     Papel -->|"Não"| Forbidden["403: acesso negado"]
-    Papel -->|"Sim"| Controller["Executar controller e regras existentes"]
+    Papel -->|"Sim"| Controller["Controller e regras de negócio"]
 ```
 
-O desenho representa a política das operações existentes, não um cadastro de
-papéis acessível ao público. A aplicação provisiona somente um administrador.
-Um ID inexistente retorna 404 somente depois de passar pela autorização.
+## 1. Entenda as responsabilidades
 
-## 1. Dependências e autenticação administrativa
+| Parte | Responsabilidade |
+| --- | --- |
+| Migration V3 | Criar tabela, identidade, username único e campos obrigatórios |
+| AdminAccount e repository | Modelar a conta e o acesso sem expor JPA ao domínio |
+| Adapter JPA | Consultar conta e gravar o cadastro inicial |
+| AdminProvisioningService | Validar entrada, aplicar BCrypt e impedir sobrescrita |
+| AdminConfiguration | Adaptar conta persistida para UserDetailsService |
+| SecurityConfiguration | Proteger PUT/DELETE e preservar acesso público |
+| AdminSetupCommand | Ler usuário e senha em terminal, sem servidor web |
 
-Spring Security usa um `UserDetailsService` em memória para a única conta do
-administrador. O username e o hash BCrypt são exigidos no ambiente da API.
-Não existe senha padrão nem seed de credencial no PostgreSQL.
-O serviço compara a senha apresentada com BCrypt através de
-`DaoAuthenticationProvider`; o código não compara senhas diretamente.
+Não coloque uma senha real ou um hash com senha conhecida numa migration. Ela é
+versionada e aplicada em todas as instalações. A tabela usa índice único em
+username; não é necessário criar outro índice para a mesma busca.
+
+## 2. Inicialização e cadastro inicial
+
+```mermaid
+sequenceDiagram
+    actor Professor
+    participant CLI as Comando setup-admin
+    participant Flyway
+    participant Servico as AdminProvisioningService
+    participant Banco as PostgreSQL
+    Professor->>CLI: Informar usuário, senha e confirmação
+    Note over CLI: Senha sem eco, somente na memória
+    CLI->>Flyway: Iniciar contexto sem servidor web
+    Flyway->>Banco: Aplicar V3 sem seed de credencial
+    CLI->>Servico: provision(username, password)
+    Servico->>Servico: Validar entrada e gerar BCrypt
+    Servico->>Banco: Bloquear tabela durante o cadastro inicial
+    alt Já existe administrador
+        Banco-->>Servico: Recusar nova conta inicial
+        Servico-->>CLI: Erro sem alterar a conta
+    else Tabela vazia
+        Servico->>Banco: Gravar username, hash e active=true
+        Banco-->>Servico: Conta persistida
+        Servico-->>CLI: Cadastro concluído
+    end
+```
+
+O bloqueio exclusivo ocorre somente no provisionamento, dentro da transação.
+Isso impede que duas execuções simultâneas criem duas primeiras contas. Não é
+um bloqueio aplicado às consultas normais ou a cada login.
+
+## 3. Crie ou substitua os arquivos desta etapa
+
+Aplique todos os arquivos abaixo. Eles são completos e correspondem ao checkpoint.
+O build acrescenta Spring Security e seu suporte de testes. O domínio continua
+sem JPA; a persistência segue o mesmo padrão dos catálogos.
 
 ### `build.gradle`
 
-Crie o arquivo ou substitua seu conteúdo inteiro, se já existir.
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
 
 <!-- arquivo: build.gradle -->
 ```groovy
@@ -68,33 +110,179 @@ dependencies {
 tasks.named('test') { useJUnitPlatform() }
 ```
 
+### `src/main/resources/db/migration/V3__create_administrators.sql`
+
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
+
+<!-- arquivo: src/main/resources/db/migration/V3__create_administrators.sql -->
+```sql
+CREATE TABLE administrators (
+    id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    username VARCHAR(100) NOT NULL UNIQUE CHECK (length(btrim(username)) > 0),
+    password_hash VARCHAR(60) NOT NULL,
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+-- A primeira conta é provisionada interativamente, nunca por seed de senha.
+```
+
+### `src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/domain/AdminAccount.java`
+
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
+
+<!-- arquivo: src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/domain/AdminAccount.java -->
+```java
+package br.com.etecalbertoferes.CaixaDeSugestoes.domain;
+
+public record AdminAccount(Long id, String username, String passwordHash, boolean active) {
+    @Override public String toString() { return "AdminAccount[id=" + id + ", active=" + active + "]"; }
+}
+```
+
+### `src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/domain/AdminAccountRepository.java`
+
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
+
+<!-- arquivo: src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/domain/AdminAccountRepository.java -->
+```java
+package br.com.etecalbertoferes.CaixaDeSugestoes.domain;
+
+import java.util.Optional;
+public interface AdminAccountRepository {
+    Optional<AdminAccount> findByUsername(String username);
+    boolean createInitial(String username, String passwordHash);
+}
+```
+
+### `src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/infrastructure/persistence/AdminAccountEntity.java`
+
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
+
+<!-- arquivo: src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/infrastructure/persistence/AdminAccountEntity.java -->
+```java
+package br.com.etecalbertoferes.CaixaDeSugestoes.infrastructure.persistence;
+
+import jakarta.persistence.*;
+@Entity
+@Table(name = "administrators")
+public class AdminAccountEntity {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY) Long id;
+    @Column(nullable = false, unique = true, length = 100) String username;
+    @Column(name = "password_hash", nullable = false, length = 60) String passwordHash;
+    @Column(nullable = false) boolean active;
+    protected AdminAccountEntity() {}
+}
+```
+
+### `src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/infrastructure/persistence/AdminAccountJpaRepository.java`
+
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
+
+<!-- arquivo: src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/infrastructure/persistence/AdminAccountJpaRepository.java -->
+```java
+package br.com.etecalbertoferes.CaixaDeSugestoes.infrastructure.persistence;
+
+import java.util.Optional;
+import org.springframework.data.jpa.repository.JpaRepository;
+interface AdminAccountJpaRepository extends JpaRepository<AdminAccountEntity, Long> {
+    Optional<AdminAccountEntity> findByUsername(String username);
+}
+```
+
+### `src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/infrastructure/persistence/AdminAccountPersistenceAdapter.java`
+
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
+
+<!-- arquivo: src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/infrastructure/persistence/AdminAccountPersistenceAdapter.java -->
+```java
+package br.com.etecalbertoferes.CaixaDeSugestoes.infrastructure.persistence;
+
+import java.util.Optional;
+import jakarta.persistence.EntityManager;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+import br.com.etecalbertoferes.CaixaDeSugestoes.domain.*;
+@Repository
+@Transactional(readOnly = true)
+public class AdminAccountPersistenceAdapter implements AdminAccountRepository {
+    private final AdminAccountJpaRepository repository;
+    private final EntityManager em;
+    public AdminAccountPersistenceAdapter(AdminAccountJpaRepository repository, EntityManager em) {
+        this.repository = repository; this.em = em;
+    }
+    public Optional<AdminAccount> findByUsername(String username) {
+        return repository.findByUsername(username).map(e -> new AdminAccount(e.id, e.username, e.passwordHash, e.active));
+    }
+    @Transactional
+    public boolean createInitial(String username, String passwordHash) {
+        // Serializa apenas o provisionamento; duas execuções não criam duas contas iniciais.
+        em.createNativeQuery("LOCK TABLE administrators IN EXCLUSIVE MODE").executeUpdate();
+        if (repository.count() != 0) return false;
+        AdminAccountEntity entity = new AdminAccountEntity();
+        entity.username = username; entity.passwordHash = passwordHash; entity.active = true;
+        repository.saveAndFlush(entity);
+        return true;
+    }
+}
+```
+
+### `src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/application/AdminProvisioningService.java`
+
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
+
+<!-- arquivo: src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/application/AdminProvisioningService.java -->
+```java
+package br.com.etecalbertoferes.CaixaDeSugestoes.application;
+
+import java.nio.charset.StandardCharsets;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import br.com.etecalbertoferes.CaixaDeSugestoes.domain.AdminAccountRepository;
+@Service
+public class AdminProvisioningService {
+    private final AdminAccountRepository accounts;
+    private final PasswordEncoder encoder;
+    public AdminProvisioningService(AdminAccountRepository accounts, PasswordEncoder encoder) {
+        this.accounts = accounts; this.encoder = encoder;
+    }
+    @Transactional
+    public void provision(String username, String password) {
+        if (username == null || username.isBlank() || username.length() > 100 || !username.equals(username.strip()))
+            throw new IllegalArgumentException("Use um usuário de até 100 caracteres, sem espaços nas extremidades");
+        if (password == null || password.length() < 12 || password.getBytes(StandardCharsets.UTF_8).length > 72)
+            throw new IllegalArgumentException("A senha deve ter ao menos 12 caracteres e no máximo 72 bytes UTF-8");
+        if (!accounts.createInitial(username, encoder.encode(password)))
+            throw new IllegalStateException("Já existe administrador; o provisionamento não altera contas existentes");
+    }
+}
+```
+
 ### `src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/infrastructure/security/AdminConfiguration.java`
 
-Crie o arquivo ou substitua seu conteúdo inteiro, se já existir.
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
 
 <!-- arquivo: src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/infrastructure/security/AdminConfiguration.java -->
 ```java
 package br.com.etecalbertoferes.CaixaDeSugestoes.infrastructure.security;
 
 import org.springframework.context.annotation.*;
-import org.springframework.core.env.Environment;
 import org.springframework.security.authentication.*;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.core.userdetails.*;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.provisioning.InMemoryUserDetailsManager;
-
+import br.com.etecalbertoferes.CaixaDeSugestoes.domain.AdminAccountRepository;
 @Configuration
 public class AdminConfiguration {
     @Bean PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(12); }
-    @Bean UserDetailsService adminUsers(Environment env) {
-        String username = env.getRequiredProperty("app.admin.username");
-        String hash = env.getRequiredProperty("app.admin.password-hash");
-        if (username.isBlank() || !hash.matches("\\$2[aby]\\$\\d{2}\\$[./A-Za-z0-9]{53}")) {
-            throw new IllegalStateException("Configure ADMIN_USERNAME e ADMIN_PASSWORD_HASH com um hash BCrypt válido");
-        }
-        return new InMemoryUserDetailsManager(User.withUsername(username).password(hash).roles("ADMIN").build());
+    @Bean UserDetailsService adminUsers(AdminAccountRepository accounts) {
+        return username -> {
+            var account = accounts.findByUsername(username)
+                .orElseThrow(() -> new UsernameNotFoundException("Credenciais inválidas"));
+            return User.withUsername(account.username()).password(account.passwordHash())
+                .disabled(!account.active()).roles("ADMIN").build();
+        };
     }
     @Bean AuthenticationManager authenticationManager(UserDetailsService users, PasswordEncoder encoder) {
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider(users);
@@ -104,100 +292,9 @@ public class AdminConfiguration {
 }
 ```
 
-## 2. Respostas de segurança e permissões
-
-Falhas nos filtros de segurança ocorrem antes dos controllers; por isso precisam
-de handlers próprios para produzir o mesmo `ApiError` usado no REST.
-O 401 inclui `WWW-Authenticate`, enquanto 403 significa identidade reconhecida
-sem a permissão requerida. As respostas não incluem senha, hash ou stack trace.
-A conta disponível no produto tem ADMIN; o cenário READER existe somente em teste.
-
-### `src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/infrastructure/security/SecurityErrorWriter.java`
-
-Crie o arquivo ou substitua seu conteúdo inteiro, se já existir.
-
-<!-- arquivo: src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/infrastructure/security/SecurityErrorWriter.java -->
-```java
-package br.com.etecalbertoferes.CaixaDeSugestoes.infrastructure.security;
-
-import java.io.IOException;
-import java.time.Instant;
-import java.util.Map;
-import jakarta.servlet.http.*;
-import org.springframework.http.MediaType;
-import org.springframework.stereotype.Component;
-import tools.jackson.databind.ObjectMapper;
-import br.com.etecalbertoferes.CaixaDeSugestoes.interfaces.rest.ApiError;
-
-@Component
-public class SecurityErrorWriter {
-    private final ObjectMapper mapper;
-    public SecurityErrorWriter(ObjectMapper mapper) { this.mapper = mapper; }
-    public void write(HttpServletRequest request, HttpServletResponse response, int status, String message) throws IOException {
-        response.setStatus(status);
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.setCharacterEncoding("UTF-8");
-        mapper.writeValue(response.getOutputStream(), new ApiError(Instant.now(), status, message, request.getRequestURI(), Map.of()));
-    }
-}
-```
-
-### `src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/infrastructure/security/SecurityConfiguration.java`
-
-Crie o arquivo ou substitua seu conteúdo inteiro, se já existir.
-
-<!-- arquivo: src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/infrastructure/security/SecurityConfiguration.java -->
-```java
-package br.com.etecalbertoferes.CaixaDeSugestoes.infrastructure.security;
-
-import jakarta.servlet.DispatcherType;
-import org.springframework.context.annotation.*;
-import org.springframework.http.HttpMethod;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.web.SecurityFilterChain;
-
-@Configuration
-public class SecurityConfiguration {
-    @Bean SecurityFilterChain apiSecurity(HttpSecurity http, SecurityErrorWriter errors) throws Exception {
-        return http
-            .csrf(csrf -> csrf.disable())
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .requestCache(cache -> cache.disable())
-            .authorizeHttpRequests(auth -> auth
-                .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-                .requestMatchers(HttpMethod.PUT, "/api/suggestions/*").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.DELETE, "/api/suggestions/*").hasRole("ADMIN")
-                .anyRequest().permitAll())
-            .httpBasic(basic -> basic.authenticationEntryPoint((req, res, ex) -> {
-                res.setHeader("WWW-Authenticate", "Basic realm=\"administracao\"");
-                errors.write(req, res, 401, "Autenticação necessária");
-            }))
-            .exceptionHandling(ex -> ex
-                .authenticationEntryPoint((req, res, cause) -> {
-                    res.setHeader("WWW-Authenticate", "Basic realm=\"administracao\"");
-                    errors.write(req, res, 401, "Autenticação necessária");
-                })
-                .accessDeniedHandler((req, res, cause) -> errors.write(req, res, 403, "Acesso negado")))
-            .build();
-    }
-}
-```
-
-Este checkpoint é um exercício intermediário de clientes HTTP. Basic deve usar
-HTTPS fora de localhost e não será o mecanismo do projeto web. Não associe esta
-configuração sem CSRF a login de navegador por cookies ou Basic automático;
-no módulo 09 usaremos exclusivamente Bearer explícito e nenhuma sessão/cookie.
-
-## 3. Gere o hash sem colocar senha no histórico
-
-O modo auxiliar abaixo funciona antes de carregar Spring, banco ou credenciais.
-A senha é lida em terminal interativo sem eco. BCrypt admite no máximo 72 bytes;
-o provisionamento exige pelo menos 12 caracteres.
-
 ### `src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/infrastructure/security/AdminPasswordHash.java`
 
-Crie o arquivo ou substitua seu conteúdo inteiro, se já existir.
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
 
 <!-- arquivo: src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/infrastructure/security/AdminPasswordHash.java -->
 ```java
@@ -225,9 +322,120 @@ public final class AdminPasswordHash {
 }
 ```
 
+### `src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/infrastructure/security/AdminSetupCommand.java`
+
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
+
+<!-- arquivo: src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/infrastructure/security/AdminSetupCommand.java -->
+```java
+package br.com.etecalbertoferes.CaixaDeSugestoes.infrastructure.security;
+
+import java.io.Console;
+import java.util.Arrays;
+import org.springframework.boot.WebApplicationType;
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import br.com.etecalbertoferes.CaixaDeSugestoes.CaixaDeSugestoesApplication;
+import br.com.etecalbertoferes.CaixaDeSugestoes.application.AdminProvisioningService;
+public final class AdminSetupCommand {
+    private AdminSetupCommand() {}
+    public static void run() {
+        Console console = System.console();
+        if (console == null) throw new IllegalStateException("Execute o JAR em terminal interativo com --setup-admin");
+        String username = console.readLine("Usuário do administrador: ");
+        char[] password = console.readPassword("Senha (mínimo 12 caracteres): ");
+        char[] confirmation = console.readPassword("Confirme a senha: ");
+        try {
+            if (password == null || confirmation == null || !Arrays.equals(password, confirmation))
+                throw new IllegalArgumentException("As senhas não conferem ou a leitura foi cancelada");
+            try (var context = new SpringApplicationBuilder(CaixaDeSugestoesApplication.class)
+                    .web(WebApplicationType.NONE).run()) {
+                context.getBean(AdminProvisioningService.class).provision(username, new String(password));
+                console.printf("Administrador cadastrado no banco. Inicie a API e faça login com a senha escolhida.%n");
+            }
+        } finally {
+            if (password != null) Arrays.fill(password, '\0');
+            if (confirmation != null) Arrays.fill(confirmation, '\0');
+        }
+    }
+}
+```
+
+### `src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/infrastructure/security/SecurityConfiguration.java`
+
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
+
+<!-- arquivo: src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/infrastructure/security/SecurityConfiguration.java -->
+```java
+package br.com.etecalbertoferes.CaixaDeSugestoes.infrastructure.security;
+
+import jakarta.servlet.DispatcherType;
+import org.springframework.context.annotation.*;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.SecurityFilterChain;
+
+@org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication
+@Configuration
+public class SecurityConfiguration {
+    @Bean SecurityFilterChain apiSecurity(HttpSecurity http, SecurityErrorWriter errors) throws Exception {
+        return http
+            .csrf(csrf -> csrf.disable())
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .requestCache(cache -> cache.disable())
+            .authorizeHttpRequests(auth -> auth
+                .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
+                .requestMatchers(HttpMethod.PUT, "/api/suggestions/*").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.DELETE, "/api/suggestions/*").hasRole("ADMIN")
+                .anyRequest().permitAll())
+            .httpBasic(basic -> basic.authenticationEntryPoint((req, res, ex) -> {
+                res.setHeader("WWW-Authenticate", "Basic realm=\"administracao\"");
+                errors.write(req, res, 401, "Autenticação necessária");
+            }))
+            .exceptionHandling(ex -> ex
+                .authenticationEntryPoint((req, res, cause) -> {
+                    res.setHeader("WWW-Authenticate", "Basic realm=\"administracao\"");
+                    errors.write(req, res, 401, "Autenticação necessária");
+                })
+                .accessDeniedHandler((req, res, cause) -> errors.write(req, res, 403, "Acesso negado")))
+            .build();
+    }
+}
+```
+
+### `src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/infrastructure/security/SecurityErrorWriter.java`
+
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
+
+<!-- arquivo: src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/infrastructure/security/SecurityErrorWriter.java -->
+```java
+package br.com.etecalbertoferes.CaixaDeSugestoes.infrastructure.security;
+
+import java.io.IOException;
+import java.time.Instant;
+import java.util.Map;
+import jakarta.servlet.http.*;
+import org.springframework.http.MediaType;
+import org.springframework.stereotype.Component;
+import tools.jackson.databind.ObjectMapper;
+import br.com.etecalbertoferes.CaixaDeSugestoes.interfaces.rest.ApiError;
+
+@Component
+public class SecurityErrorWriter {
+    private final ObjectMapper mapper;
+    public SecurityErrorWriter(ObjectMapper mapper) { this.mapper = mapper; }
+    public void write(HttpServletRequest request, HttpServletResponse response, int status, String message) throws IOException {
+        response.setStatus(status);
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.setCharacterEncoding("UTF-8");
+        mapper.writeValue(response.getOutputStream(), new ApiError(Instant.now(), status, message, request.getRequestURI(), Map.of()));
+    }
+}
+```
+
 ### `src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/CaixaDeSugestoesApplication.java`
 
-Crie o arquivo ou substitua seu conteúdo inteiro, se já existir.
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
 
 <!-- arquivo: src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/CaixaDeSugestoesApplication.java -->
 ```java
@@ -239,6 +447,10 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication
 public class CaixaDeSugestoesApplication {
     public static void main(String[] args) {
+        if (args.length == 1 && "--setup-admin".equals(args[0])) {
+            br.com.etecalbertoferes.CaixaDeSugestoes.infrastructure.security.AdminSetupCommand.run();
+            return;
+        }
         if (args.length == 1 && "--generate-admin-password-hash".equals(args[0])) {
             br.com.etecalbertoferes.CaixaDeSugestoes.infrastructure.security.AdminPasswordHash.generate();
             return;
@@ -248,72 +460,9 @@ public class CaixaDeSugestoesApplication {
 }
 ```
 
-### `src/main/resources/application.yaml`
-
-Crie o arquivo ou substitua seu conteúdo inteiro, se já existir.
-
-<!-- arquivo: src/main/resources/application.yaml -->
-```yaml
-server:
-  port: ${SERVER_PORT:8000}
-spring:
-  application:
-    name: CaixaDeSugestoes
-  datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/suggestions}
-    username: ${DB_USERNAME:suggestions}
-    password: ${DB_PASSWORD:suggestions}
-  jpa:
-    open-in-view: false
-    hibernate:
-      ddl-auto: validate
-    properties:
-      hibernate:
-        jdbc:
-          time_zone: UTC
-  flyway:
-    enabled: true
-springdoc:
-  swagger-ui:
-    path: /swagger-ui.html
-  api-docs:
-    path: /v3/api-docs
-app:
-  admin:
-    username: ${ADMIN_USERNAME}
-    password-hash: ${ADMIN_PASSWORD_HASH}
-```
-
-Gere o JAR primeiro; `bootJar` não inicia o contexto nem exige configuração:
-
-```powershell
-.\gradlew.bat bootJar
-java -jar build/libs/CaixaDeSugestoes-0.0.1-SNAPSHOT.jar --generate-admin-password-hash
-```
-
-Digite uma senha própria quando solicitado. Copie somente o hash impresso.
-No terminal que iniciará a API, configure os valores locais:
-
-```powershell
-$env:ADMIN_USERNAME = 'administrador'
-$env:ADMIN_PASSWORD_HASH = 'COLE_O_HASH_BCRYPT_GERADO'
-docker compose up -d --wait
-.\gradlew.bat bootRun
-```
-
-Use aspas simples em volta do hash para preservar `$`. Não salve a senha em
-texto puro na configuração ou no Git. O hash também deve ficar fora dos arquivos
-versionados. A API falha na inicialização se essas variáveis estiverem ausentes.
-No Linux/macOS, use `export ADMIN_USERNAME=...` e `export ADMIN_PASSWORD_HASH='...'`.
-Um `.env` do Compose não é automaticamente carregado pela aplicação Java.
-
-## Swagger neste checkpoint
-
-O botão Authorize usa Basic somente nas operações protegidas. Substitua os arquivos abaixo.
-
 ### `src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/interfaces/rest/OpenApiConfiguration.java`
 
-Crie o arquivo ou substitua seu conteúdo inteiro, se já existir.
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
 
 <!-- arquivo: src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/interfaces/rest/OpenApiConfiguration.java -->
 ```java
@@ -334,7 +483,7 @@ public class OpenApiConfiguration {
 
 ### `src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/interfaces/rest/SuggestionController.java`
 
-Crie o arquivo ou substitua seu conteúdo inteiro, se já existir.
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
 
 <!-- arquivo: src/main/java/br/com/etecalbertoferes/CaixaDeSugestoes/interfaces/rest/SuggestionController.java -->
 ```java
@@ -401,170 +550,49 @@ public class SuggestionController {
 }
 ```
 
-## 4. Adapte os testes mantendo os filtros nas verificações de segurança
+### `src/test/java/br/com/etecalbertoferes/CaixaDeSugestoes/AdminProvisioningIntegrationTest.java`
 
-O perfil `test` configura apenas valores de teste. `ContextTest` gera seu próprio
-hash e fornece a conexão de Testcontainers. `DirtiesContext` impede reutilizar um
-contexto cujo container já terminou quando outra classe herda a infraestrutura.
-Os testes de contrato MVC isolados desabilitam filtros; a classe específica de
-segurança e a integração completa mantêm os filtros reais.
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
 
-### `src/test/resources/application-test.yaml`
-
-Crie o arquivo ou substitua seu conteúdo inteiro, se já existir.
-
-<!-- arquivo: src/test/resources/application-test.yaml -->
-```yaml
-app:
-  admin:
-    username: test-admin
-spring:
-  datasource:
-    hikari:
-      connection-timeout: 3000
-```
-
-### `src/test/java/br/com/etecalbertoferes/CaixaDeSugestoes/ContextTest.java`
-
-Crie o arquivo ou substitua seu conteúdo inteiro, se já existir.
-
-<!-- arquivo: src/test/java/br/com/etecalbertoferes/CaixaDeSugestoes/ContextTest.java -->
+<!-- arquivo: src/test/java/br/com/etecalbertoferes/CaixaDeSugestoes/AdminProvisioningIntegrationTest.java -->
 ```java
 package br.com.etecalbertoferes.CaixaDeSugestoes;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
-import static org.assertj.core.api.Assertions.assertThat;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
+import static org.assertj.core.api.Assertions.*;
 
-@org.springframework.test.context.ActiveProfiles("test")
-@org.springframework.test.annotation.DirtiesContext(classMode = org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
-@SpringBootTest
-@Testcontainers
-class ContextTest {
-    static final String ADMIN_PASSWORD = "Test-Admin-2026!";
-    static final String ADMIN_HASH = new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder(10).encode(ADMIN_PASSWORD);
-    @Container static final PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:17");
-    @DynamicPropertySource static void database(DynamicPropertyRegistry registry) {
-        registry.add("app.admin.password-hash", () -> ADMIN_HASH);
-        registry.add("spring.datasource.url", postgres::getJdbcUrl);
-        registry.add("spring.datasource.username", postgres::getUsername);
-        registry.add("spring.datasource.password", postgres::getPassword);
+@Transactional
+class AdminProvisioningIntegrationTest extends ContextTest {
+    @Autowired PasswordEncoder encoder;
+    @Test void firstAccountStoresHashAndRefusesReplacement() {
+        jdbc.update("delete from administrators");
+        provisioning.provision("first-admin", ADMIN_PASSWORD);
+        var account = accounts.findByUsername("first-admin").orElseThrow();
+        assertThat(account.active()).isTrue();
+        assertThat(account.passwordHash()).isNotEqualTo(ADMIN_PASSWORD);
+        assertThat(encoder.matches(ADMIN_PASSWORD, account.passwordHash())).isTrue();
+        assertThatThrownBy(() -> provisioning.provision("another-admin", "Another-Password-2026!"))
+            .isInstanceOf(IllegalStateException.class).hasMessageContaining("Já existe administrador");
+        assertThat(jdbc.queryForObject("select count(*) from administrators", Long.class)).isEqualTo(1L);
+        assertThat(accounts.findByUsername("first-admin").orElseThrow().passwordHash()).isEqualTo(account.passwordHash());
     }
-    @Autowired JdbcTemplate jdbc;
-    @Test void migrationsAndSeeds() {
-        assertThat(jdbc.queryForObject("select count(*) from courses", Long.class)).isEqualTo(4L);
-        assertThat(jdbc.queryForObject("select count(*) from categories", Long.class)).isEqualTo(3L);
-        assertThat(jdbc.queryForObject("select count(*) from suggestions", Long.class)).isZero();
-    }
-}
-```
-
-### `src/test/java/br/com/etecalbertoferes/CaixaDeSugestoes/interfaces/rest/SuggestionControllerTest.java`
-
-Crie o arquivo ou substitua seu conteúdo inteiro, se já existir.
-
-<!-- arquivo: src/test/java/br/com/etecalbertoferes/CaixaDeSugestoes/interfaces/rest/SuggestionControllerTest.java -->
-```java
-package br.com.etecalbertoferes.CaixaDeSugestoes.interfaces.rest;
-
-import br.com.etecalbertoferes.CaixaDeSugestoes.application.*;
-import br.com.etecalbertoferes.CaixaDeSugestoes.domain.*;
-import java.time.Instant;
-import java.util.List;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.http.MediaType;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-
-@org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc(addFilters = false)
-@WebMvcTest(SuggestionController.class)
-class SuggestionControllerTest {
-    @Autowired MockMvc mvc;
-    @MockitoBean SuggestionService service;
-    private static final String VALID = """
-        {"title":"Biblioteca","content":"Mais tomadas","courseId":1,"categoryId":2}
-        """;
-    private Suggestion example() {
-        return new Suggestion(7L, "Biblioteca", "Mais tomadas", null, Instant.parse("2026-10-08T12:00:00Z"),
-            new Course(1L, "Curso"), new Category(2L, "Sugestão"));
-    }
-    @Test void createReturnsLocationAndAnonymous() throws Exception {
-        when(service.create(any())).thenReturn(example());
-        mvc.perform(post("/api/suggestions").contentType(MediaType.APPLICATION_JSON).content(VALID))
-            .andExpect(status().isCreated()).andExpect(header().string("Location", "/api/suggestions/7"))
-            .andExpect(jsonPath("$.author").value("Anônimo")).andExpect(jsonPath("$.course.id").value(1))
-            .andExpect(jsonPath("$.createdAt").value("2026-10-08T12:00:00Z"));
-    }
-    @Test void emptyListIsArray() throws Exception {
-        when(service.list(null, null, null)).thenReturn(List.of());
-        mvc.perform(get("/api/suggestions")).andExpect(status().isOk()).andExpect(content().json("[]"));
-    }
-    @Test void getUpdateAndDelete() throws Exception {
-        when(service.get(7L)).thenReturn(example());
-        when(service.update(eq(7L), any())).thenReturn(example());
-        mvc.perform(get("/api/suggestions/7")).andExpect(status().isOk()).andExpect(jsonPath("$.id").value(7));
-        mvc.perform(put("/api/suggestions/7").contentType(MediaType.APPLICATION_JSON).content(VALID))
-            .andExpect(status().isOk());
-        mvc.perform(delete("/api/suggestions/7")).andExpect(status().isNoContent()).andExpect(content().string(""));
-    }
-    @Test void invalidBodyHasFieldErrors() throws Exception {
-        mvc.perform(post("/api/suggestions").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"title\":\"  \",\"content\":\"\",\"courseId\":0,\"categoryId\":-1}"))
-            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.status").value(400))
-            .andExpect(jsonPath("$.fieldErrors.title").value("Título é obrigatório"))
-            .andExpect(jsonPath("$.fieldErrors.content").exists()).andExpect(jsonPath("$.fieldErrors.courseId").exists())
-            .andExpect(jsonPath("$.fieldErrors.categoryId").exists());
-        verifyNoInteractions(service);
-    }
-    @Test void invalidIdsAndFilters() throws Exception {
-        for (String path : List.of("/api/suggestions/0", "/api/suggestions/-1", "/api/suggestions/abc",
-                "/api/suggestions?courseId=-1", "/api/suggestions?categoryId=0", "/api/suggestions?courseId=abc")) {
-            mvc.perform(get(path)).andExpect(status().isBadRequest()).andExpect(jsonPath("$.status").value(400));
-        }
-        verifyNoInteractions(service);
-    }
-    @Test void malformedMissingAndNullBodies() throws Exception {
-        for (String body : List.of("", "{", "null", "{}")) {
-            mvc.perform(post("/api/suggestions").contentType(MediaType.APPLICATION_JSON).content(body))
-                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.path").value("/api/suggestions"));
-        }
-        verifyNoInteractions(service);
-    }
-    @Test void notFoundAndCatalogNotFound() throws Exception {
-        when(service.get(7L)).thenThrow(new ResourceNotFoundException("Sugestão não encontrada"));
-        when(service.create(any())).thenThrow(new ResourceNotFoundException("Categoria não encontrada"));
-        mvc.perform(get("/api/suggestions/7")).andExpect(status().isNotFound()).andExpect(jsonPath("$.message").value("Sugestão não encontrada"));
-        mvc.perform(post("/api/suggestions").contentType(MediaType.APPLICATION_JSON).content(VALID))
-            .andExpect(status().isNotFound()).andExpect(jsonPath("$.fieldErrors").isEmpty());
-    }
-    @Test void protocolStatusesAndGenericError() throws Exception {
-        mvc.perform(patch("/api/suggestions/7").contentType(MediaType.APPLICATION_JSON).content(VALID))
-            .andExpect(status().isMethodNotAllowed()).andExpect(header().exists("Allow")).andExpect(jsonPath("$.status").value(405));
-        mvc.perform(post("/api/suggestions").contentType(MediaType.TEXT_PLAIN).content("texto"))
-            .andExpect(status().isUnsupportedMediaType()).andExpect(jsonPath("$.status").value(415));
-        when(service.get(7L)).thenThrow(new RuntimeException("SQL password secret"));
-        mvc.perform(get("/api/suggestions/7")).andExpect(status().isInternalServerError())
-            .andExpect(jsonPath("$.message").value("Erro interno do servidor"));
+    @Test void invalidInputDoesNotCreateAccounts() {
+        jdbc.update("delete from administrators");
+        for (String name : new String[]{"", "  ", " padded ", "x".repeat(101)})
+            assertThatThrownBy(() -> provisioning.provision(name, ADMIN_PASSWORD)).isInstanceOf(IllegalArgumentException.class);
+        for (String password : new String[]{"short", "ç".repeat(50)})
+            assertThatThrownBy(() -> provisioning.provision("admin", password)).isInstanceOf(IllegalArgumentException.class);
+        assertThat(jdbc.queryForObject("select count(*) from administrators", Long.class)).isZero();
     }
 }
 ```
 
 ### `src/test/java/br/com/etecalbertoferes/CaixaDeSugestoes/ApiIntegrationTest.java`
 
-Crie o arquivo ou substitua seu conteúdo inteiro, se já existir.
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
 
 <!-- arquivo: src/test/java/br/com/etecalbertoferes/CaixaDeSugestoes/ApiIntegrationTest.java -->
 ```java
@@ -665,7 +693,7 @@ class ApiIntegrationTest extends ContextTest {
 
 ### `src/test/java/br/com/etecalbertoferes/CaixaDeSugestoes/BasicSecurityIntegrationTest.java`
 
-Crie o arquivo ou substitua seu conteúdo inteiro, se já existir.
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
 
 <!-- arquivo: src/test/java/br/com/etecalbertoferes/CaixaDeSugestoes/BasicSecurityIntegrationTest.java -->
 ```java
@@ -703,6 +731,13 @@ class BasicSecurityIntegrationTest extends ContextTest {
         mvc.perform(delete("/api/suggestions/999999").with(httpBasic("test-admin", "wrong")))
             .andExpect(status().isUnauthorized());
     }
+    @Test void inactiveAdminCannotAuthenticate() throws Exception {
+        jdbc.update("update administrators set active=false where username=?", "test-admin");
+        try {
+            mvc.perform(delete("/api/suggestions/999999").with(httpBasic("test-admin", ADMIN_PASSWORD)))
+                .andExpect(status().isUnauthorized());
+        } finally { jdbc.update("update administrators set active=true where username=?", "test-admin"); }
+    }
     @Test void authenticatedNonAdminGetsForbidden() throws Exception {
         mvc.perform(delete("/api/suggestions/999999").with(user("reader").roles("READER")))
             .andExpect(status().isForbidden()).andExpect(jsonPath("$.status").value(403));
@@ -710,35 +745,223 @@ class BasicSecurityIntegrationTest extends ContextTest {
 }
 ```
 
-## 5. Execute e teste no cliente
+### `src/test/java/br/com/etecalbertoferes/CaixaDeSugestoes/ContextTest.java`
 
-```powershell
-.\gradlew.bat test bootJar
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
+
+<!-- arquivo: src/test/java/br/com/etecalbertoferes/CaixaDeSugestoes/ContextTest.java -->
+```java
+package br.com.etecalbertoferes.CaixaDeSugestoes;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.postgresql.PostgreSQLContainer;
+import static org.assertj.core.api.Assertions.assertThat;
+
+@org.springframework.test.context.ActiveProfiles("test")
+@org.springframework.test.annotation.DirtiesContext(classMode = org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
+@SpringBootTest
+@Testcontainers
+class ContextTest {
+    static final String ADMIN_PASSWORD = "Test-Admin-2026!";
+    @Container static final PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:17");
+    @DynamicPropertySource static void database(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", postgres::getJdbcUrl);
+        registry.add("spring.datasource.username", postgres::getUsername);
+        registry.add("spring.datasource.password", postgres::getPassword);
+    }
+    @Autowired JdbcTemplate jdbc;
+    @Autowired br.com.etecalbertoferes.CaixaDeSugestoes.domain.AdminAccountRepository accounts;
+    @Autowired br.com.etecalbertoferes.CaixaDeSugestoes.application.AdminProvisioningService provisioning;
+    @org.junit.jupiter.api.BeforeEach void provisionTestAdmin() {
+        if (accounts.findByUsername("test-admin").isEmpty()) provisioning.provision("test-admin", ADMIN_PASSWORD);
+    }
+    @Test void migrationsAndSeeds() {
+        assertThat(jdbc.queryForObject("select count(*) from courses", Long.class)).isEqualTo(4L);
+        assertThat(jdbc.queryForObject("select count(*) from categories", Long.class)).isEqualTo(3L);
+        assertThat(jdbc.queryForObject("select count(*) from suggestions", Long.class)).isZero();
+    }
+}
 ```
 
-Nos clientes, consultas e POST de sugestões não enviam autenticação. Para PUT e
-DELETE, escolha **Basic Auth** e informe o administrador configurado.
-As collections deste checkpoint usam `adminUsername` e `adminPassword`, vazios
-na exportação. Preencha localmente e não exporte suas credenciais pessoais.
-Collections da etapa 07 continuam correspondendo à versão sem autenticação.
+### `src/test/java/br/com/etecalbertoferes/CaixaDeSugestoes/interfaces/rest/SuggestionControllerTest.java`
 
-| Cenário | Resultado |
-| --- | --- |
-| Consulta pública | 200 |
-| POST válido sem login | 201 |
-| PUT/DELETE sem credencial ou com senha errada | 401 |
-| Conta autenticada sem ADMIN, somente no teste | 403 |
-| Administrador em sugestão existente | 200 no PUT; 204 no DELETE |
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
 
-## Confira antes de avançar
+<!-- arquivo: src/test/java/br/com/etecalbertoferes/CaixaDeSugestoes/interfaces/rest/SuggestionControllerTest.java -->
+```java
+package br.com.etecalbertoferes.CaixaDeSugestoes.interfaces.rest;
 
-- A conta administrativa vem do ambiente e usa hash BCrypt.
-- O público consulta e envia sugestões sem login.
-- Alterar e excluir exigem ADMIN.
-- A suíte confere 401 e 403 com filtros ativos.
-- A senha não está no código, no Git nem nos arquivos exportados.
+import br.com.etecalbertoferes.CaixaDeSugestoes.application.*;
+import br.com.etecalbertoferes.CaixaDeSugestoes.domain.*;
+import java.time.Instant;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-Explique por que o campo author não concede nenhuma permissão. Faça um commit
-no seu projeto antes de continuar para [09 — JWT e Bearer Token](09-jwt-bearer-token.md).
+@org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc(addFilters = false)
+@WebMvcTest(SuggestionController.class)
+class SuggestionControllerTest {
+    @Autowired MockMvc mvc;
+    @MockitoBean SuggestionService service;
+    private static final String VALID = """
+        {"title":"Biblioteca","content":"Mais tomadas","courseId":1,"categoryId":2}
+        """;
+    private Suggestion example() {
+        return new Suggestion(7L, "Biblioteca", "Mais tomadas", null, Instant.parse("2026-10-08T12:00:00Z"),
+            new Course(1L, "Curso"), new Category(2L, "Sugestão"));
+    }
+    @Test void createReturnsLocationAndAnonymous() throws Exception {
+        when(service.create(any())).thenReturn(example());
+        mvc.perform(post("/api/suggestions").contentType(MediaType.APPLICATION_JSON).content(VALID))
+            .andExpect(status().isCreated()).andExpect(header().string("Location", "/api/suggestions/7"))
+            .andExpect(jsonPath("$.author").value("Anônimo")).andExpect(jsonPath("$.course.id").value(1))
+            .andExpect(jsonPath("$.createdAt").value("2026-10-08T12:00:00Z"));
+    }
+    @Test void emptyListIsArray() throws Exception {
+        when(service.list(null, null, null)).thenReturn(List.of());
+        mvc.perform(get("/api/suggestions")).andExpect(status().isOk()).andExpect(content().json("[]"));
+    }
+    @Test void getUpdateAndDelete() throws Exception {
+        when(service.get(7L)).thenReturn(example());
+        when(service.update(eq(7L), any())).thenReturn(example());
+        mvc.perform(get("/api/suggestions/7")).andExpect(status().isOk()).andExpect(jsonPath("$.id").value(7));
+        mvc.perform(put("/api/suggestions/7").contentType(MediaType.APPLICATION_JSON).content(VALID))
+            .andExpect(status().isOk());
+        mvc.perform(delete("/api/suggestions/7")).andExpect(status().isNoContent()).andExpect(content().string(""));
+    }
+    @Test void invalidBodyHasFieldErrors() throws Exception {
+        mvc.perform(post("/api/suggestions").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"  \",\"content\":\"\",\"courseId\":0,\"categoryId\":-1}"))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.status").value(400))
+            .andExpect(jsonPath("$.fieldErrors.title").value("Título é obrigatório"))
+            .andExpect(jsonPath("$.fieldErrors.content").exists()).andExpect(jsonPath("$.fieldErrors.courseId").exists())
+            .andExpect(jsonPath("$.fieldErrors.categoryId").exists());
+        verifyNoInteractions(service);
+    }
+    @Test void invalidIdsAndFilters() throws Exception {
+        for (String path : List.of("/api/suggestions/0", "/api/suggestions/-1", "/api/suggestions/abc",
+                "/api/suggestions?courseId=-1", "/api/suggestions?categoryId=0", "/api/suggestions?courseId=abc")) {
+            mvc.perform(get(path)).andExpect(status().isBadRequest()).andExpect(jsonPath("$.status").value(400));
+        }
+        verifyNoInteractions(service);
+    }
+    @Test void malformedMissingAndNullBodies() throws Exception {
+        for (String body : List.of("", "{", "null", "{}")) {
+            mvc.perform(post("/api/suggestions").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.path").value("/api/suggestions"));
+        }
+        verifyNoInteractions(service);
+    }
+    @Test void notFoundAndCatalogNotFound() throws Exception {
+        when(service.get(7L)).thenThrow(new ResourceNotFoundException("Sugestão não encontrada"));
+        when(service.create(any())).thenThrow(new ResourceNotFoundException("Categoria não encontrada"));
+        mvc.perform(get("/api/suggestions/7")).andExpect(status().isNotFound()).andExpect(jsonPath("$.message").value("Sugestão não encontrada"));
+        mvc.perform(post("/api/suggestions").contentType(MediaType.APPLICATION_JSON).content(VALID))
+            .andExpect(status().isNotFound()).andExpect(jsonPath("$.fieldErrors").isEmpty());
+    }
+    @Test void protocolStatusesAndGenericError() throws Exception {
+        mvc.perform(patch("/api/suggestions/7").contentType(MediaType.APPLICATION_JSON).content(VALID))
+            .andExpect(status().isMethodNotAllowed()).andExpect(header().exists("Allow")).andExpect(jsonPath("$.status").value(405));
+        mvc.perform(post("/api/suggestions").contentType(MediaType.TEXT_PLAIN).content("texto"))
+            .andExpect(status().isUnsupportedMediaType()).andExpect(jsonPath("$.status").value(415));
+        when(service.get(7L)).thenThrow(new RuntimeException("SQL password secret"));
+        mvc.perform(get("/api/suggestions/7")).andExpect(status().isInternalServerError())
+            .andExpect(jsonPath("$.message").value("Erro interno do servidor"));
+    }
+}
+```
 
-Referência: [autenticação por senha do Spring Security](https://docs.spring.io/spring-security/reference/servlet/authentication/passwords/index.html).
+### `src/test/resources/application-test.yaml`
+
+Crie o arquivo ou substitua seu conteúdo inteiro. Preserve os demais arquivos.
+
+<!-- arquivo: src/test/resources/application-test.yaml -->
+```yaml
+spring:
+  datasource:
+    hikari:
+      connection-timeout: 3000
+```
+
+Os auxiliares antigos de geração de hash continuam apenas por compatibilidade;
+o fluxo principal abaixo não pede que você copie um hash para a configuração.
+O bean da cadeia HTTP é condicional ao contexto web, permitindo executar o
+provisionamento sem abrir uma porta HTTP.
+
+Os testes de contrato MVC isolados desabilitam filtros; os de segurança e
+integração mantêm os filtros reais. O administrador dos testes é provisionado no
+PostgreSQL temporário pelo BeforeEach, não por seed de produção.
+
+## 4. Cadastre o administrador uma única vez
+
+No terminal do VSCode, a partir da raiz do projeto:
+
+```bash
+docker compose up -d --wait
+./gradlew bootJar
+java -jar build/libs/CaixaDeSugestoes-0.0.1-SNAPSHOT.jar --setup-admin
+```
+
+No Windows, use `.\gradlew.bat bootJar`. Digite username, senha e confirmação.
+A senha exige pelo menos 12 caracteres e no máximo 72 bytes UTF-8. O comando usa
+terminal interativo; execute o JAR diretamente para que a senha fique sem eco.
+Ele aplica migrations e fecha o contexto ao terminar, sem iniciar HTTP.
+
+O cadastro não exige ADMIN_USERNAME nem ADMIN_PASSWORD_HASH. Se a tabela já tiver
+uma conta, o comando falha e não altera usuário, senha ou estado ativo. Não é um
+comando de reset de senha. Não apague contas para repetir a aula em um banco com
+dados reais; use um banco isolado de demonstração.
+
+Depois:
+
+```bash
+./gradlew bootRun
+```
+
+É possível iniciar a API antes de provisionar: consultas e envios públicos
+funcionam; nenhuma credencial administrativa será aceita enquanto não houver
+conta ativa. Basic deve usar HTTPS fora de localhost. Esta configuração sem CSRF
+é um checkpoint de clientes HTTP, não uma configuração de sessão de navegador.
+
+## 5. Confira no cliente e nos testes
+
+Nas collections do checkpoint 08, preencha `adminUsername` e `adminPassword` com
+a conta cadastrada. Somente PUT/DELETE usam Basic. Não exporte os valores reais.
+O usuário pode enviar e consultar sugestões sem autenticação.
+
+```bash
+./gradlew test bootJar
+```
+
+Espere **30 testes**, com PostgreSQL real. A suíte verifica BCrypt persistido,
+recusa de segundo provisionamento, validação de entrada, conta inativa, 401 e 403,
+além do contrato anterior. Desativar a conta no banco impede novo login Basic.
+O schema não cria uma relação de propriedade entre administrador e sugestão.
+
+## Pronto quando
+
+- A migration V3 existe sem credencial embutida.
+- O comando interativo cadastra a primeira conta e recusa sobrescrevê-la.
+- O banco contém hash BCrypt, nunca senha em texto puro.
+- API pública continua acessível, e PUT/DELETE exigem ADMIN ativo.
+- Os 30 testes passam sem ignorar integração.
+
+Faça um commit e explique a diferença entre preparar o schema e provisionar uma
+credencial. Continue em [09 — JWT e Bearer](09-jwt-bearer-token.md).
+
+Referência: [DaoAuthenticationProvider](https://docs.spring.io/spring-security/reference/7.0/servlet/authentication/passwords/dao-authentication-provider.html).
