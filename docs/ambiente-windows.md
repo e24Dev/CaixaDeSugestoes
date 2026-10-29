@@ -213,6 +213,28 @@ java {
 
 Mantenha essa configuração. A toolchain define o Java usado nas tarefas Java; a **Gradle JVM** define o Java que executa o Gradle. Para esta aula, ambos devem usar **17**.
 
+### Quem usa qual instalação Java?
+
+Há três escolhas para conferir: Java dos comandos do terminal, Java que executa
+o Gradle e Java que compila/testa o projeto. Nesta trilha, configure todas para 17.
+O runtime interno que abre a IDE pode ser diferente e não substitui essas escolhas.
+
+```mermaid
+flowchart TD
+    JDK["Oracle JDK 17 instalado em Program Files"] --> Variaveis["JAVA_HOME e Path"]
+    Variaveis --> Terminal["java e javac no terminal"]
+    JDK --> SDK["Project SDK e Module SDK"]
+    SDK --> Execucao["Execução Java pela IDE"]
+    JDK --> JVM["Gradle JVM da IDE"]
+    JVM --> Gradle["Gradle Wrapper"]
+    Gradle --> Toolchain["Toolchain 17 no build.gradle"]
+    JDK --> Toolchain
+    Toolchain --> Build["Compilar e executar testes Java"]
+```
+
+**Diagnóstico:** o terminal mostrar 17 não garante que a IDE escolheu a mesma
+Gradle JVM. Confira cada caminho indicado antes de alterar o código do projeto.
+
 ## 10. Valide o ambiente com o Wrapper
 
 Depois de criar o projeto no módulo 01, abra um novo terminal PowerShell, inclusive dentro do IntelliJ, e execute:
