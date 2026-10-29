@@ -17,6 +17,10 @@ arquivos completos para reprodução; o código executável fica nos checkpoints
 A etapa `07-testes-entrega-impl` preserva a versão completa sem autenticação.
 Em cada checkpoint executável, leia `SOLUCAO.md` para iniciar a versão correspondente.
 
+Para executar a versão JWT no VSCode, configure o arquivo local de credenciais
+conforme `SOLUCAO.md` na branch de implementação. O exemplo está em
+`config/application.properties.example`; o arquivo preenchido fica fora do Git.
+
 ## Roteiro incremental
 
 ```mermaid

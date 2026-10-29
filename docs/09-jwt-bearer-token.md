@@ -529,6 +529,29 @@ placeholders literais acima: a aplicação exige valores válidos. Fora de local
 use HTTPS. `.env` é ignorado pelo Git e não é carregado automaticamente pelo Java.
 O arquivo `.env.example` lista os nomes, sem credenciais reais.
 
+### Configurar uma vez no VSCode
+
+Para não repetir exports em cada terminal, crie `config/application.properties`
+na raiz do seu projeto com os mesmos valores gerados acima:
+
+```properties
+ADMIN_USERNAME=administrador
+ADMIN_PASSWORD_HASH=COLE_O_HASH_BCRYPT_GERADO
+JWT_SECRET_BASE64=COLE_A_CHAVE_ALEATORIA_GERADA
+JWT_TTL_SECONDS=900
+```
+
+Substitua os placeholders pelos valores reais. Não use aspas no `.properties`.
+Acrescente `config/application.properties` ao seu `.gitignore`; nunca versione
+esse arquivo preenchido. A solução fornece `config/application.properties.example`
+para copiar somente na primeira configuração. Não sobrescreva uma chave existente.
+
+O Spring Boot carrega `./config/application.properties` automaticamente a partir
+da raiz do projeto. Isso funciona no terminal do VSCode, no `bootRun` e no JAR,
+sem alterar a configuração de segurança. Variáveis de ambiente têm prioridade.
+Se a aplicação indicar placeholder administrativo ausente, confira o arquivo e
+o diretório de trabalho, conforme o diagnóstico de `SOLUCAO.md` na solução.
+
 ## 6. Atualize Swagger
 
 O botão **Authorize** agora recebe somente o JWT (sem escrever `Bearer` no campo;

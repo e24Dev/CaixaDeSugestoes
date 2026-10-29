@@ -1,0 +1,9 @@
+# Copie para config/application.properties e preencha os valores gerados.
+# O Spring Boot carrega esse arquivo automaticamente a partir da raiz do projeto.
+# Não coloque aspas em volta dos valores neste arquivo .properties.
+# Nunca escreva a senha em texto puro aqui: somente o hash BCrypt.
+ADMIN_USERNAME=administrador
+ADMIN_PASSWORD_HASH=
+JWT_SECRET_BASE64=
+JWT_TTL_SECONDS=900
+# Opcional: SERVER_PORT=8080

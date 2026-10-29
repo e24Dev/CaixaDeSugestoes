@@ -32,3 +32,17 @@ sua própria instância, siga [SOLUCAO.md](SOLUCAO.md).
 
 A reprodução dos tutoriais e a renderização dos diagramas estão registradas
 separadamente em [docs/validacao.md](docs/validacao.md).
+
+## Diagnóstico de bootRun no VSCode
+
+`./gradlew build` foi executado novamente: aprovado, com os 32 testes. A falha
+de `./gradlew bootRun` foi reproduzida e identificada como ausência de
+`ADMIN_USERNAME` no ambiente de execução; PostgreSQL e migrations funcionaram.
+
+Foi acrescentado `config/application.properties.example` e a regra de Git para
+ignorar o arquivo preenchido. A leitura automática de `config/application.properties`
+foi verificada em um JAR iniciado de uma pasta temporária, sem as variáveis
+administrativas exportadas: login, token e persistência após reinício aprovados.
+A validação usou credenciais aleatórias temporárias e não provisionou uma senha
+padrão na cópia de trabalho. O administrador deve escolher e configurar suas
+próprias credenciais conforme `SOLUCAO.md`.

@@ -39,6 +39,62 @@ Banco, usuário e senha locais do PostgreSQL são `suggestions`; overrides:
 Swagger: `http://localhost:8000/swagger-ui.html`. JSON: `/v3/api-docs`.
 Defina `SERVER_PORT` e ajuste `baseUrl` se precisar de outra porta.
 
+## VSCode no macOS/Linux: configuração persistente
+
+`./gradlew build` compila e executa testes. `./gradlew bootRun` também inicia a
+aplicação e exige as credenciais administrativas. Se aparecer
+`Could not resolve placeholder 'ADMIN_USERNAME'`, faltou configurar a execução;
+não é falha de compilação. Não use as credenciais do perfil de teste na aplicação.
+
+Na raiz do projeto, no terminal zsh/bash do VSCode:
+
+```bash
+./gradlew bootJar
+java -jar build/libs/CaixaDeSugestoes-0.0.1-SNAPSHOT.jar --generate-admin-password-hash
+java -jar build/libs/CaixaDeSugestoes-0.0.1-SNAPSHOT.jar --generate-jwt-secret
+cp config/application.properties.example config/application.properties
+```
+
+O primeiro auxiliar pede sua senha sem mostrá-la; anote a senha para o login e
+copie o hash impresso. O segundo imprime a chave JWT. Abra
+`config/application.properties` no VSCode e preencha `ADMIN_PASSWORD_HASH` e
+`JWT_SECRET_BASE64`. Defina também o username desejado.
+
+No arquivo `.properties`, escreva os valores **sem aspas**; o `$` do BCrypt é
+literal. A senha em texto puro não entra nesse arquivo. Ele já é ignorado pelo
+Git. Não recopie o exemplo sobre um arquivo que já configurou: preserve sua chave.
+
+O Spring Boot lê `./config/application.properties` automaticamente quando o
+diretório de trabalho é a raiz do projeto, tanto no `bootRun` quanto no JAR e na
+execução pela IDE. Não depende de `.env` nem de exportar variáveis a cada terminal.
+Variáveis de ambiente já definidas têm prioridade sobre os valores desse arquivo.
+
+```bash
+docker compose up -d --wait
+./gradlew bootRun
+```
+
+A porta é a indicada no log de inicialização. Para fixar 8080, descomente
+`SERVER_PORT=8080` no arquivo local e use `http://localhost:8080/swagger-ui.html`.
+Atualize `baseUrl` nas collections para a mesma porta. Se já houver outra cópia
+nessa porta, encerre-a antes de executar novamente.
+
+Para executar a partir de outra pasta, informe explicitamente o diretório local:
+
+```bash
+java -jar /caminho/para/app.jar --spring.config.additional-location=file:/caminho/do/projeto/config/
+```
+
+### Outras falhas de execução
+
+| Mensagem | Conferência |
+| --- | --- |
+| Placeholder ADMIN_USERNAME/ADMIN_PASSWORD_HASH/JWT_SECRET_BASE64 ausente | Preencha o arquivo local ou exporte as variáveis no terminal que inicia a API |
+| Hash BCrypt inválido | Use o auxiliar e copie o hash inteiro, sem aspas no `.properties` |
+| Chave Base64 inválida ou curta | Gere com `--generate-jwt-secret` e copie a linha inteira |
+| Connection refused / falha no PostgreSQL | Inicie Docker e confira `docker compose ps` e DB_URL |
+| Port already in use | Pare a instância anterior ou use outra SERVER_PORT |
+
 ## Acesso e login
 
 | Operação | Acesso |
